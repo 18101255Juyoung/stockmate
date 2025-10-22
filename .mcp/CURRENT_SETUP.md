@@ -1,9 +1,9 @@
 # 현재 MCP 설정 상태
 
 ## 📅 마지막 업데이트
-2024-10-22
+2024-10-22 (Postgres + Sequential Thinking MCP 추가)
 
-## ✅ 활성화된 MCP
+## ✅ 활성화된 MCP (총 3개)
 
 ### 1. Context7 MCP
 - **이름**: `context7-mcp`
@@ -17,9 +17,56 @@
 npx -y @smithery/cli@latest run @upstash/context7-mcp --key <API_KEY>
 ```
 
+**용도:** 코드베이스 분석, 컨텍스트 추적, AI 개발 보조
+
+---
+
+### 2. Postgres MCP
+- **이름**: `postgres`
+- **제공자**: Model Context Protocol
+- **버전**: Latest
+- **상태**: ✅ 활성화
+- **연결**: stockmate 데이터베이스
+
+**실행 명령어:**
+```bash
+npx -y @modelcontextprotocol/server-postgres postgresql://postgres:***@localhost:5432/stockmate
+```
+
+**용도:** 실시간 DB 쿼리, 데이터 분석, 성능 최적화
+
+**주요 기능:**
+- 🗄️ SQL 쿼리 자동 생성 및 실행
+- 📊 통계 및 집계 분석
+- 🔍 스키마 및 인덱스 분석
+- 💡 성능 최적화 제안
+
+---
+
+### 3. Sequential Thinking MCP
+- **이름**: `sequential-thinking`
+- **제공자**: Model Context Protocol
+- **버전**: Latest
+- **상태**: ✅ 활성화
+
+**실행 명령어:**
+```bash
+npx -y @modelcontextprotocol/server-sequential-thinking
+```
+
+**용도:** 단계별 사고 과정 시각화, 복잡한 문제 해결, 디버깅
+
+**주요 기능:**
+- 🧩 복잡한 문제 단계별 분해
+- 🔬 논리적 추론 과정 투명화
+- 🐛 디버깅 과정 시각화
+- 📚 학습 효과 극대화
+
+---
+
 **설정 위치:**
 - 글로벌: `%APPDATA%\Claude\claude_desktop_config.json`
-- 프로젝트: 이 문서로 관리 (API 키는 개인 설정)
+- 프로젝트: `.mcp/` 폴더에 문서로 관리
 
 ---
 

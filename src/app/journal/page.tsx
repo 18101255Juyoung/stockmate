@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 
 interface Transaction {
   id: string
@@ -16,14 +18,22 @@ interface Transaction {
 }
 
 export default function JournalPage() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // 거래 내역 로드
+  // Authentication check
   useEffect(() => {
-    fetchTransactions()
-  }, [])
+    if (status === 'loading') return
+    if (status === 'unauthenticated') {
+      router.push('/login')
+    } else if (status === 'authenticated') {
+      fetchTransactions()
+    }
+  }, [status, router])
 
   const fetchTransactions = async () => {
     setLoading(true)
@@ -63,6 +73,22 @@ export default function JournalPage() {
     if (transaction.type !== 'SELL') return null
     // 실제로는 평균 매입가와 비교해야 하지만, 여기서는 간단히 표시
     return transaction.totalAmount - transaction.quantity * transaction.price
+  }
+
+  // Show loading state during authentication
+  if (status === 'loading') {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center py-12">
+          <p className="text-gray-600">로딩 중...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Don't render content if not authenticated
+  if (status === 'unauthenticated') {
+    return null
   }
 
   return (

@@ -118,7 +118,7 @@ export async function executeBuy(
     // Execute transaction in a database transaction
     const result = await prisma.$transaction(async (tx) => {
       // 1. Create transaction record
-      const transaction = await tx.transaction.create({
+      const txRecord = await tx.transaction.create({
         data: {
           userId,
           type: 'BUY',
@@ -181,7 +181,7 @@ export async function executeBuy(
         },
       })
 
-      return transaction
+      return txRecord
     })
 
     // 4. Update portfolio metrics (outside transaction for performance)
@@ -324,7 +324,7 @@ export async function executeSell(
     // Execute transaction in a database transaction
     const result = await prisma.$transaction(async (tx) => {
       // 1. Create transaction record
-      const transaction = await tx.transaction.create({
+      const txRecord = await tx.transaction.create({
         data: {
           userId,
           type: 'SELL',
@@ -366,7 +366,7 @@ export async function executeSell(
         },
       })
 
-      return transaction
+      return txRecord
     })
 
     // 4. Update portfolio metrics (outside transaction for performance)

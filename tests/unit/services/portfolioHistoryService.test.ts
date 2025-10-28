@@ -1,11 +1,10 @@
 import { getPortfolioHistory } from '@/lib/services/portfolioHistoryService'
-import prisma from '@/lib/prisma'
+import { prisma } from '@/lib/prisma'
 import { ErrorCodes } from '@/lib/types/api'
 
 // Mock Prisma
 jest.mock('@/lib/prisma', () => ({
-  __esModule: true,
-  default: {
+  prisma: {
     user: {
       findUnique: jest.fn(),
     },

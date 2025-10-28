@@ -1,28 +1,27 @@
 import { getStockPrice, searchStocks, getStockInfo } from '@/lib/services/stockService'
-import { getKISApiClient } from '@/lib/utils/kisApi'
+import { prisma } from '@/lib/prisma'
 import { StockPrice, StockSearchResult } from '@/lib/types/stock'
 import cache from '@/lib/utils/cache'
 
-// Mock KIS API client
-jest.mock('@/lib/utils/kisApi')
+// Mock Prisma client
+jest.mock('@/lib/prisma', () => ({
+  prisma: {
+    stock: {
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+    },
+  },
+}))
+
+const mockPrisma = prisma as jest.Mocked<typeof prisma>
 
 describe('StockService', () => {
-  let mockKISClient: any
-
   beforeEach(() => {
     // Reset mocks
     jest.clearAllMocks()
 
     // Clear cache before each test
     cache.clear()
-
-    // Create mock KIS client
-    mockKISClient = {
-      callApi: jest.fn(),
-      getTrId: jest.fn(),
-    }
-
-    ;(getKISApiClient as jest.Mock).mockReturnValue(mockKISClient)
   })
 
   afterAll(() => {
@@ -32,42 +31,37 @@ describe('StockService', () => {
 
   describe('getStockPrice', () => {
     it('should fetch and return current stock price', async () => {
-      // Mock KIS API response for Samsung Electronics (005930)
-      const mockKISResponse = {
-        stck_prpr: '70000', // 현재가
-        prdy_vrss: '1000', // 전일 대비
-        prdy_vrss_sign: '2', // 상승
-        prdy_ctrt: '1.45', // 전일 대비율
-        stck_oprc: '69500', // 시가
-        stck_hgpr: '70500', // 고가
-        stck_lwpr: '69000', // 저가
-        acml_vol: '12345678', // 거래량
-        hts_kor_isnm: '삼성전자', // 종목명
+      // Mock database stock record
+      const mockStock = {
+        stockCode: '005930',
+        stockName: '삼성전자',
+        market: 'KOSPI',
+        currentPrice: 70000,
+        openPrice: 69500,
+        highPrice: 70500,
+        lowPrice: 69000,
+        volume: BigInt(12345678),
+        priceUpdatedAt: new Date('2024-01-15T10:00:00Z'),
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        updatedAt: new Date('2024-01-15T10:00:00Z'),
       }
 
-      mockKISClient.getTrId.mockReturnValue('FHKST01010100')
-      mockKISClient.callApi.mockResolvedValue(mockKISResponse)
+      mockPrisma.stock.findUnique.mockResolvedValue(mockStock as any)
 
       const result: StockPrice = await getStockPrice('005930')
 
-      // Verify KIS API was called with correct params
-      expect(mockKISClient.getTrId).toHaveBeenCalledWith('STOCK_PRICE')
-      expect(mockKISClient.callApi).toHaveBeenCalledWith(
-        expect.stringContaining('/quotations/inquire-price'),
-        expect.objectContaining({
-          FID_COND_MRKT_DIV_CODE: 'J',
-          FID_INPUT_ISCD: '005930',
-        }),
-        'FHKST01010100'
-      )
+      // Verify Prisma was called with correct params
+      expect(mockPrisma.stock.findUnique).toHaveBeenCalledWith({
+        where: { stockCode: '005930' },
+      })
 
       // Verify response format
       expect(result).toMatchObject({
         stockCode: '005930',
         stockName: '삼성전자',
         currentPrice: 70000,
-        changePrice: 1000,
-        changeRate: 1.45,
+        changePrice: 0, // TODO: will be implemented with price history
+        changeRate: 0, // TODO: will be implemented with price history
         openPrice: 69500,
         highPrice: 70500,
         lowPrice: 69000,
@@ -77,20 +71,21 @@ describe('StockService', () => {
     })
 
     it('should cache stock price for 5 minutes', async () => {
-      const mockKISResponse = {
-        stck_prpr: '70000',
-        prdy_vrss: '1000',
-        prdy_vrss_sign: '2',
-        prdy_ctrt: '1.45',
-        stck_oprc: '69500',
-        stck_hgpr: '70500',
-        stck_lwpr: '69000',
-        acml_vol: '12345678',
-        hts_kor_isnm: '삼성전자',
+      const mockStock = {
+        stockCode: '005930',
+        stockName: '삼성전자',
+        market: 'KOSPI',
+        currentPrice: 70000,
+        openPrice: 69500,
+        highPrice: 70500,
+        lowPrice: 69000,
+        volume: BigInt(12345678),
+        priceUpdatedAt: new Date('2024-01-15T10:00:00Z'),
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        updatedAt: new Date('2024-01-15T10:00:00Z'),
       }
 
-      mockKISClient.getTrId.mockReturnValue('FHKST01010100')
-      mockKISClient.callApi.mockResolvedValue(mockKISResponse)
+      mockPrisma.stock.findUnique.mockResolvedValue(mockStock as any)
 
       // First call
       await getStockPrice('005930')
@@ -98,60 +93,70 @@ describe('StockService', () => {
       // Second call (should use cache)
       await getStockPrice('005930')
 
-      // API should only be called once due to caching
-      expect(mockKISClient.callApi).toHaveBeenCalledTimes(1)
+      // Database should only be queried once due to caching
+      expect(mockPrisma.stock.findUnique).toHaveBeenCalledTimes(1)
     })
 
     it('should throw error for invalid stock code', async () => {
-      mockKISClient.getTrId.mockReturnValue('FHKST01010100')
-      mockKISClient.callApi.mockRejectedValue(new Error('KIS API error: [ERROR] Invalid stock code'))
+      // Mock stock not found in database
+      mockPrisma.stock.findUnique.mockResolvedValue(null)
 
-      await expect(getStockPrice('INVALID')).rejects.toThrow('Invalid stock code')
+      await expect(getStockPrice('INVALID')).rejects.toThrow('Stock not available')
     })
 
-    it('should handle KIS API error', async () => {
-      mockKISClient.getTrId.mockReturnValue('FHKST01010100')
-      mockKISClient.callApi.mockRejectedValue(new Error('KIS API error'))
+    it('should handle database error', async () => {
+      mockPrisma.stock.findUnique.mockRejectedValue(new Error('Database error'))
 
-      await expect(getStockPrice('005930')).rejects.toThrow()
+      await expect(getStockPrice('005930')).rejects.toThrow('Database error')
     })
   })
 
   describe('searchStocks', () => {
-    // Note: searchStocks is now DB-based, not KIS API-based
-    // These tests need to be rewritten to use Prisma mocks
-    it.skip('should search stocks by name', async () => {
-      // Mock KIS API response for "삼성" search
-      const mockKISResponse = [
+    it('should search stocks by name', async () => {
+      // Mock database search results
+      const mockStocks = [
         {
-          pdno: '005930',
-          prdt_name: '삼성전자',
-          prdt_type_cd: '300',
-          mket_id_cd: 'J', // KOSPI
+          stockCode: '005930',
+          stockName: '삼성전자',
+          market: 'KOSPI',
+          currentPrice: 70000,
+          openPrice: 69500,
+          highPrice: 70500,
+          lowPrice: 69000,
+          volume: BigInt(12345678),
+          priceUpdatedAt: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
         {
-          pdno: '005935',
-          prdt_name: '삼성전자우',
-          prdt_type_cd: '300',
-          mket_id_cd: 'J',
+          stockCode: '005935',
+          stockName: '삼성전자우',
+          market: 'KOSPI',
+          currentPrice: 60000,
+          openPrice: 59500,
+          highPrice: 60500,
+          lowPrice: 59000,
+          volume: BigInt(1234567),
+          priceUpdatedAt: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
       ]
 
-      mockKISClient.getTrId.mockReturnValue('CTPF1002R')
-      mockKISClient.callApi.mockResolvedValue(mockKISResponse)
+      mockPrisma.stock.findMany.mockResolvedValue(mockStocks as any)
 
       const results: StockSearchResult[] = await searchStocks('삼성')
 
-      // Verify API call
-      expect(mockKISClient.getTrId).toHaveBeenCalledWith('STOCK_SEARCH')
-      expect(mockKISClient.callApi).toHaveBeenCalledWith(
-        expect.stringContaining('/search-stock-info'),
-        expect.objectContaining({
-          PRDT_TYPE_CD: '300',
-          PDNO: '삼성',
-        }),
-        'CTPF1002R'
-      )
+      // Verify Prisma query
+      expect(mockPrisma.stock.findMany).toHaveBeenCalledWith({
+        where: {
+          OR: [{ stockName: { contains: '삼성' } }, { stockCode: { contains: '삼성' } }],
+        },
+        take: 20,
+        orderBy: {
+          stockName: 'asc',
+        },
+      })
 
       // Verify results
       expect(results).toHaveLength(2)
@@ -168,8 +173,7 @@ describe('StockService', () => {
     })
 
     it('should return empty array if no results found', async () => {
-      mockKISClient.getTrId.mockReturnValue('CTPF1002R')
-      mockKISClient.callApi.mockResolvedValue([])
+      mockPrisma.stock.findMany.mockResolvedValue([])
 
       const results = await searchStocks('NONEXISTENT')
 
@@ -180,18 +184,24 @@ describe('StockService', () => {
       await expect(searchStocks('')).rejects.toThrow('Search query cannot be empty')
     })
 
-    it.skip('should cache search results for 5 minutes', async () => {
-      const mockKISResponse = [
+    it('should cache search results for 5 minutes', async () => {
+      const mockStocks = [
         {
-          pdno: '005930',
-          prdt_name: '삼성전자',
-          prdt_type_cd: '300',
-          mket_id_cd: 'J',
+          stockCode: '005930',
+          stockName: '삼성전자',
+          market: 'KOSPI',
+          currentPrice: 70000,
+          openPrice: 69500,
+          highPrice: 70500,
+          lowPrice: 69000,
+          volume: BigInt(12345678),
+          priceUpdatedAt: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
       ]
 
-      mockKISClient.getTrId.mockReturnValue('CTPF1002R')
-      mockKISClient.callApi.mockResolvedValue(mockKISResponse)
+      mockPrisma.stock.findMany.mockResolvedValue(mockStocks as any)
 
       // First call
       await searchStocks('삼성')
@@ -199,27 +209,28 @@ describe('StockService', () => {
       // Second call (should use cache)
       await searchStocks('삼성')
 
-      // API should only be called once
-      expect(mockKISClient.callApi).toHaveBeenCalledTimes(1)
+      // Database should only be queried once
+      expect(mockPrisma.stock.findMany).toHaveBeenCalledTimes(1)
     })
   })
 
   describe('getStockInfo', () => {
     it('should return stock info (alias for getStockPrice)', async () => {
-      const mockKISResponse = {
-        stck_prpr: '70000',
-        prdy_vrss: '1000',
-        prdy_vrss_sign: '2',
-        prdy_ctrt: '1.45',
-        stck_oprc: '69500',
-        stck_hgpr: '70500',
-        stck_lwpr: '69000',
-        acml_vol: '12345678',
-        hts_kor_isnm: '삼성전자',
+      const mockStock = {
+        stockCode: '005930',
+        stockName: '삼성전자',
+        market: 'KOSPI',
+        currentPrice: 70000,
+        openPrice: 69500,
+        highPrice: 70500,
+        lowPrice: 69000,
+        volume: BigInt(12345678),
+        priceUpdatedAt: new Date('2024-01-15T10:00:00Z'),
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        updatedAt: new Date('2024-01-15T10:00:00Z'),
       }
 
-      mockKISClient.getTrId.mockReturnValue('FHKST01010100')
-      mockKISClient.callApi.mockResolvedValue(mockKISResponse)
+      mockPrisma.stock.findUnique.mockResolvedValue(mockStock as any)
 
       const result = await getStockInfo('005930')
 
@@ -229,23 +240,31 @@ describe('StockService', () => {
   })
 
   describe('error handling', () => {
-    it('should handle network errors gracefully', async () => {
-      mockKISClient.getTrId.mockReturnValue('FHKST01010100')
-      mockKISClient.callApi.mockRejectedValue(new Error('Network error'))
+    it('should handle database errors gracefully', async () => {
+      mockPrisma.stock.findUnique.mockRejectedValue(new Error('Database connection error'))
 
-      await expect(getStockPrice('005930')).rejects.toThrow('Network error')
+      await expect(getStockPrice('005930')).rejects.toThrow('Database connection error')
     })
 
-    it('should handle malformed KIS API response', async () => {
-      mockKISClient.getTrId.mockReturnValue('FHKST01010100')
-      mockKISClient.callApi.mockResolvedValue({
-        // Missing required fields
-        stck_prpr: '70000',
-      })
+    it('should handle stock with missing price data', async () => {
+      // Mock stock with currentPrice = 0 (not yet updated)
+      const mockStock = {
+        stockCode: '005930',
+        stockName: '삼성전자',
+        market: 'KOSPI',
+        currentPrice: 0,
+        openPrice: 0,
+        highPrice: 0,
+        lowPrice: 0,
+        volume: BigInt(0),
+        priceUpdatedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
 
-      // Should still work but with some fields undefined/0
-      const result = await getStockPrice('005930')
-      expect(result.currentPrice).toBe(70000)
+      mockPrisma.stock.findUnique.mockResolvedValue(mockStock as any)
+
+      await expect(getStockPrice('005930')).rejects.toThrow('Price data not available')
     })
   })
 })

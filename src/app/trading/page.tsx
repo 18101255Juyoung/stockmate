@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 import {
   ComposedChart,
   Bar,
@@ -44,6 +46,9 @@ interface ChartDataPoint {
 type ChartPeriod = 7 | 30 | 90 | 365 | 1095
 
 export default function TradingPage() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [selectedStock, setSelectedStock] = useState<StockPrice | null>(null)
@@ -60,6 +65,14 @@ export default function TradingPage() {
   const [tradeNote, setTradeNote] = useState<string>('')
   const [tradeLoading, setTradeLoading] = useState(false)
   const [tradeSuccess, setTradeSuccess] = useState<string | null>(null)
+
+  // Authentication check
+  useEffect(() => {
+    if (status === 'loading') return
+    if (status === 'unauthenticated') {
+      router.push('/login')
+    }
+  }, [status, router])
 
   // Calculate chart data with moving averages
   const chartDataWithMA = useMemo(() => {
@@ -311,6 +324,22 @@ export default function TradingPage() {
         </div>
       </div>
     )
+  }
+
+  // Show loading state during authentication
+  if (status === 'loading') {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-lg text-gray-600">로딩 중...</div>
+        </div>
+      </div>
+    )
+  }
+
+  // Don't render content if not authenticated
+  if (status === 'unauthenticated') {
+    return null
   }
 
   return (

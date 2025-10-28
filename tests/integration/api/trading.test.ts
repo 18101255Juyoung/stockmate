@@ -54,6 +54,7 @@ describe('Trading API Integration Tests', () => {
       highPrice: 71000,
       lowPrice: 68500,
       volume: 10000000,
+      updatedAt: new Date(),
     })
   })
 
@@ -102,6 +103,13 @@ describe('Trading API Integration Tests', () => {
         stockCode: '005930',
         stockName: '삼성전자',
         currentPrice: 75000,
+        changePrice: 5000,
+        changeRate: 7.14,
+        openPrice: 70000,
+        highPrice: 76000,
+        lowPrice: 70000,
+        volume: 10000000,
+        updatedAt: new Date(),
       })
 
       const result = await executeBuy(testUserId, '005930', 5)
@@ -150,6 +158,13 @@ describe('Trading API Integration Tests', () => {
         stockCode: '005930',
         stockName: '삼성전자',
         currentPrice: 75000, // Profit: 5000 per share
+        changePrice: 5000,
+        changeRate: 7.14,
+        openPrice: 70000,
+        highPrice: 76000,
+        lowPrice: 70000,
+        volume: 10000000,
+        updatedAt: new Date(),
       })
 
       const result = await executeSell(testUserId, '005930', 5)
@@ -227,6 +242,13 @@ describe('Trading API Integration Tests', () => {
         stockCode: '005930',
         stockName: '삼성전자',
         currentPrice: 75000,
+        changePrice: 5000,
+        changeRate: 7.14,
+        openPrice: 70000,
+        highPrice: 76000,
+        lowPrice: 70000,
+        volume: 10000000,
+        updatedAt: new Date(),
       })
       const sell1 = await executeSell(testUserId, '005930', 5)
       expect(sell1.success).toBe(true)
@@ -236,6 +258,13 @@ describe('Trading API Integration Tests', () => {
         stockCode: '005930',
         stockName: '삼성전자',
         currentPrice: 72000,
+        changePrice: 2000,
+        changeRate: 2.86,
+        openPrice: 70000,
+        highPrice: 73000,
+        lowPrice: 70000,
+        volume: 10000000,
+        updatedAt: new Date(),
       })
       const buy2 = await executeBuy(testUserId, '005930', 3)
       expect(buy2.success).toBe(true)
@@ -272,6 +301,13 @@ describe('Trading API Integration Tests', () => {
         stockCode: '005930',
         stockName: '삼성전자',
         currentPrice: 70000,
+        changePrice: 1000,
+        changeRate: 1.45,
+        openPrice: 69000,
+        highPrice: 71000,
+        lowPrice: 68500,
+        volume: 10000000,
+        updatedAt: new Date(),
       })
       await executeBuy(testUserId, '005930', 10) // Cost: 700,000 + fee
 
@@ -280,6 +316,13 @@ describe('Trading API Integration Tests', () => {
         stockCode: '000660',
         stockName: 'SK하이닉스',
         currentPrice: 130000,
+        changePrice: 2000,
+        changeRate: 1.56,
+        openPrice: 128000,
+        highPrice: 132000,
+        lowPrice: 128000,
+        volume: 5000000,
+        updatedAt: new Date(),
       })
       await executeBuy(testUserId, '000660', 5) // Cost: 650,000 + fee
 

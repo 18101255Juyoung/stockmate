@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 interface Holding {
@@ -34,37 +36,34 @@ interface PortfolioHistoryPoint {
 type Period = '7d' | '30d' | '90d' | '1y' | 'all'
 
 export default function PortfolioPage() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [testUserId, setTestUserId] = useState('')
-  const [inputUserId, setInputUserId] = useState('')
   const [history, setHistory] = useState<PortfolioHistoryPoint[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [selectedPeriod, setSelectedPeriod] = useState<Period>('30d')
 
   // 포트폴리오 조회
-  const fetchPortfolio = async (userId: string) => {
-    if (!userId.trim()) {
-      setError('User ID를 입력해주세요')
-      return
-    }
-
+  const fetchPortfolio = async () => {
     setLoading(true)
     setError(null)
-    setPortfolio(null)
 
     try {
-      const response = await fetch(`/api/portfolio?userId=${encodeURIComponent(userId)}`)
+      const response = await fetch('/api/portfolio')
       const data = await response.json()
 
       if (data.success) {
         setPortfolio(data.data.portfolio)
-        setTestUserId(userId)
         // 포트폴리오 조회 성공 시 히스토리도 가져오기
-        fetchPortfolioHistory(userId, selectedPeriod)
+        fetchPortfolioHistory(selectedPeriod)
       } else {
-        setError(data.error?.message || '포트폴리오를 가져오는데 실패했습니다')
+        if (data.error?.code === 'AUTH_UNAUTHORIZED') {
+          router.push('/login')
+        } else {
+          setError(data.error?.message || '포트폴리오를 가져오는데 실패했습니다')
+        }
       }
     } catch (err) {
       setError('포트폴리오를 가져오는 중 오류가 발생했습니다')
@@ -75,12 +74,10 @@ export default function PortfolioPage() {
   }
 
   // 포트폴리오 히스토리 조회
-  const fetchPortfolioHistory = async (userId: string, period: Period) => {
+  const fetchPortfolioHistory = async (period: Period) => {
     setHistoryLoading(true)
     try {
-      const response = await fetch(
-        `/api/portfolio/history?userId=${encodeURIComponent(userId)}&period=${period}`
-      )
+      const response = await fetch(`/api/portfolio/history?period=${period}`)
       const data = await response.json()
 
       if (data.success) {
@@ -97,64 +94,39 @@ export default function PortfolioPage() {
     }
   }
 
+  // 인증 상태 확인 및 리다이렉트
+  useEffect(() => {
+    if (status === 'loading') return
+
+    if (status === 'unauthenticated') {
+      router.push('/login')
+    } else if (status === 'authenticated') {
+      fetchPortfolio()
+    }
+  }, [status, router])
+
   // Period 변경 시 히스토리 다시 가져오기
   useEffect(() => {
-    if (testUserId) {
-      fetchPortfolioHistory(testUserId, selectedPeriod)
+    if (portfolio) {
+      fetchPortfolioHistory(selectedPeriod)
     }
-  }, [selectedPeriod, testUserId])
+  }, [selectedPeriod])
 
-  // 페이지 로드 시 로컬스토리지에서 userId 불러오기
-  useEffect(() => {
-    const savedUserId = localStorage.getItem('testUserId')
-    if (savedUserId) {
-      setInputUserId(savedUserId)
-      fetchPortfolio(savedUserId)
-    } else {
-      setLoading(false)
-    }
-  }, [])
-
-  // userId 저장 및 조회
-  const handleFetchPortfolio = () => {
-    localStorage.setItem('testUserId', inputUserId)
-    fetchPortfolio(inputUserId)
-  }
-
-  // Enter 키로 조회
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleFetchPortfolio()
-    }
+  // 로딩 중
+  if (status === 'loading' || loading) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        <h1 className="text-3xl font-bold mb-8">내 포트폴리오</h1>
+        <div className="flex items-center justify-center py-12">
+          <div className="text-gray-500">포트폴리오를 불러오는 중...</div>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
       <h1 className="text-3xl font-bold mb-8">내 포트폴리오</h1>
-
-      {/* 테스트용 User ID 입력 */}
-      <div className="mb-8 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <p className="text-sm text-yellow-800 mb-3">
-          ⚠️ 테스트용: 인증 시스템 구현 전까지 User ID를 직접 입력해주세요
-        </p>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={inputUserId}
-            onChange={(e) => setInputUserId(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="User ID 입력 (예: test-user-123)"
-            className="flex-1 px-4 py-2 border border-yellow-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"
-          />
-          <button
-            onClick={handleFetchPortfolio}
-            disabled={loading}
-            className="px-6 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
-            {loading ? '조회 중...' : '조회'}
-          </button>
-        </div>
-      </div>
 
       {/* 에러 메시지 */}
       {error && (
@@ -410,10 +382,9 @@ export default function PortfolioPage() {
       )}
 
       {/* 초기 안내 메시지 */}
-      {!loading && !portfolio && !error && (
+      {!portfolio && !error && (
         <div className="text-center py-12 text-gray-500">
-          <p className="text-lg mb-2">User ID를 입력하여 포트폴리오를 조회하세요</p>
-          <p className="text-sm">인증 시스템 구현 후 자동으로 조회됩니다</p>
+          <p className="text-lg mb-2">포트폴리오를 불러오는 중입니다...</p>
         </div>
       )}
     </div>

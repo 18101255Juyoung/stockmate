@@ -1,0 +1,252 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model - Basic authentication and profile
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  password     String    // bcrypt hashed
+  username     String    @unique
+  displayName  String
+  bio          String?
+  profileImage String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  portfolio    Portfolio?
+  transactions Transaction[]
+  posts        Post[]
+  comments     Comment[]
+  likes        Like[]
+  ranking      Ranking?
+
+  // Self-referential follow relationship
+  followers    Follow[]  @relation("UserFollowers")
+  following    Follow[]  @relation("UserFollowing")
+
+  @@map("users")
+}
+
+// Portfolio model - User's investment portfolio
+model Portfolio {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  initialCapital Float   @default(10000000) // 10,000,000 KRW
+  currentCash    Float   @default(10000000)
+  totalAssets    Float   @default(10000000)
+  totalReturn    Float   @default(0)         // ROI percentage
+  realizedPL     Float   @default(0)         // Realized profit/loss
+  unrealizedPL   Float   @default(0)         // Unrealized profit/loss
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  holdings      Holding[]
+
+  @@map("portfolios")
+}
+
+// Holding model - Individual stock positions
+model Holding {
+  id           String    @id @default(cuid())
+  portfolioId  String
+  portfolio    Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  stockCode    String    // Stock ticker (e.g., "005930")
+  stockName    String
+  quantity     Int
+  avgPrice     Float     // Average purchase price (FIFO)
+  currentPrice Float     // Latest price from KIS API
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([portfolioId, stockCode])
+  @@map("holdings")
+}
+
+// Transaction model - Trading history
+model Transaction {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type        TransactionType // BUY or SELL
+  stockCode   String
+  stockName   String
+  quantity    Int
+  price       Float
+  totalAmount Float            // quantity × price
+  fee         Float            @default(0)
+  note        String?          // User's investment memo
+
+  createdAt   DateTime @default(now())
+
+  // Relations
+  linkedPosts Post[]   @relation("LinkedTransactions")
+
+  @@map("transactions")
+}
+
+enum TransactionType {
+  BUY
+  SELL
+}
+
+// Post model - Community posts
+model Post {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String
+  content     String   @db.Text
+  imageUrls   String[] @default([])
+
+  isVerified  Boolean  @default(false) // Auto-verified if linked to real transactions
+  linkedTransactionIds String[] @default([])
+  linkedTransactions   Transaction[] @relation("LinkedTransactions")
+
+  likeCount    Int      @default(0)
+  commentCount Int      @default(0)
+  viewCount    Int      @default(0)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  comments     Comment[]
+  likes        Like[]
+
+  @@map("posts")
+}
+
+// Comment model - Post comments
+model Comment {
+  id        String   @id @default(cuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  content   String   @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("comments")
+}
+
+// Like model - Post likes
+model Like {
+  id        String   @id @default(cuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId]) // Prevent duplicate likes
+  @@map("likes")
+}
+
+// Follow model - User follow relationships
+model Follow {
+  id          String   @id @default(cuid())
+
+  followerId  String   // User who follows
+  follower    User     @relation("UserFollowers", fields: [followerId], references: [id], onDelete: Cascade)
+
+  followingId String   // User being followed
+  following   User     @relation("UserFollowing", fields: [followingId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId]) // Prevent duplicate follows
+  @@map("follows")
+}
+
+// Ranking model - Leaderboard entries
+model Ranking {
+  id          String       @id @default(cuid())
+  userId      String       @unique
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  rank        Int
+  totalReturn Float        // ROI for ranking
+  period      RankingPeriod
+
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([period, rank])
+  @@map("rankings")
+}
+
+enum RankingPeriod {
+  DAILY
+  WEEKLY
+  MONTHLY
+  ALL_TIME
+}
+
+// Stock model - 상장 종목 정보 (KRX 데이터)
+model Stock {
+  id        String   @id @default(cuid())
+  stockCode String   @unique // 종목코드 (e.g., "005930")
+  stockName String   // 종목명 (e.g., "삼성전자")
+  market    String   // 시장구분 (KOSPI, KOSDAQ, KONEX)
+
+  // Real-time price data (updated every 5 minutes during market hours)
+  currentPrice   Float    @default(0) // 현재가
+  openPrice      Float    @default(0) // 시가
+  highPrice      Float    @default(0) // 고가
+  lowPrice       Float    @default(0) // 저가
+  volume         BigInt   @default(0) // 거래량
+  priceUpdatedAt DateTime? // 가격 업데이트 시간
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  priceHistory StockPriceHistory[]
+
+  @@index([stockName]) // 종목명 검색 최적화
+  @@index([stockCode]) // 종목코드 검색 최적화
+  @@map("stocks")
+}
+
+// StockPriceHistory model - Daily candle data (일봉 데이터)
+model StockPriceHistory {
+  id         String   @id @default(cuid())
+  stockCode  String
+  stock      Stock    @relation(fields: [stockCode], references: [stockCode], onDelete: Cascade)
+
+  openPrice  Float    // 시가
+  highPrice  Float    // 고가
+  lowPrice   Float    // 저가
+  closePrice Float    // 종가
+  volume     BigInt   // 거래량
+  date       DateTime @db.Date // 날짜 (Date only, no time)
+
+  createdAt  DateTime @default(now())
+
+  @@unique([stockCode, date]) // Prevent duplicate entries for same stock on same day
+  @@index([stockCode, date])  // Optimize queries by stock and date range
+  @@map("stock_price_history")
+}

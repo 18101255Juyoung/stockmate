@@ -27,6 +27,17 @@
         "-y",
         "@modelcontextprotocol/server-sequential-thinking"
       ]
+    },
+    "kis-code-assistant-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@smithery/cli@latest",
+        "run",
+        "@KISOpenAPI/kis-code-assistant-mcp",
+        "--key",
+        "5a1df34d-bf89-403d-b137-36b1561d4fee"
+      ]
     }
   }
 }

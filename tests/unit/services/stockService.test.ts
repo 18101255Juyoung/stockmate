@@ -13,12 +13,24 @@ jest.mock('@/lib/prisma', () => ({
   },
 }))
 
+// Mock KIS API client
+jest.mock('@/lib/utils/kisApi')
+
+import { getKISApiClient } from '@/lib/utils/kisApi'
+
 const mockPrisma = prisma as jest.Mocked<typeof prisma>
+const mockKISClient = {
+  callApi: jest.fn(),
+}
+const mockGetKISApiClient = getKISApiClient as jest.MockedFunction<typeof getKISApiClient>
 
 describe('StockService', () => {
   beforeEach(() => {
     // Reset mocks
     jest.clearAllMocks()
+
+    // Setup KIS API client mock
+    mockGetKISApiClient.mockReturnValue(mockKISClient as any)
 
     // Clear cache before each test
     cache.clear()
@@ -101,6 +113,9 @@ describe('StockService', () => {
       // Mock stock not found in database
       mockPrisma.stock.findUnique.mockResolvedValue(null)
 
+      // Mock KIS API also fails
+      mockKISClient.callApi.mockRejectedValue(new Error('Stock not available'))
+
       await expect(getStockPrice('INVALID')).rejects.toThrow('Stock not available')
     })
 
@@ -174,6 +189,9 @@ describe('StockService', () => {
 
     it('should return empty array if no results found', async () => {
       mockPrisma.stock.findMany.mockResolvedValue([])
+
+      // Mock KIS API also returns empty array
+      mockKISClient.callApi.mockResolvedValue([])
 
       const results = await searchStocks('NONEXISTENT')
 
@@ -263,6 +281,9 @@ describe('StockService', () => {
       }
 
       mockPrisma.stock.findUnique.mockResolvedValue(mockStock as any)
+
+      // Mock KIS API also fails to provide price data
+      mockKISClient.callApi.mockRejectedValue(new Error('Price data not available'))
 
       await expect(getStockPrice('005930')).rejects.toThrow('Price data not available')
     })

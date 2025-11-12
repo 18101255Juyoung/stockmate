@@ -3,18 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import {
-  ComposedChart,
-  Bar,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-  Legend,
-} from 'recharts'
+import LightweightChart from '@/components/chart/LightweightChart'
 import { calculateMultipleMA, mergePriceWithMA } from '@/lib/utils/chartCalculations'
 
 interface StockPrice {
@@ -43,7 +32,7 @@ interface ChartDataPoint {
   volume: number
 }
 
-type ChartPeriod = 7 | 30 | 90 | 365 | 1095
+type ChartTimeframe = 'daily' | 'weekly'
 
 export default function TradingPage() {
   const { data: session, status } = useSession()
@@ -58,7 +47,8 @@ export default function TradingPage() {
   // Chart state
   const [chartData, setChartData] = useState<ChartDataPoint[]>([])
   const [chartLoading, setChartLoading] = useState(false)
-  const [chartPeriod, setChartPeriod] = useState<ChartPeriod>(30)
+  const chartPeriod = 90 // Fixed to 90 days
+  const [chartTimeframe, setChartTimeframe] = useState<ChartTimeframe>('daily')
 
   // Trading state
   const [tradeQuantity, setTradeQuantity] = useState<number>(1)
@@ -73,6 +63,27 @@ export default function TradingPage() {
       router.push('/login')
     }
   }, [status, router])
+
+  // Load default stock (Samsung Electronics) on page load
+  useEffect(() => {
+    const loadDefaultStock = async () => {
+      if (status === 'loading' || status === 'unauthenticated') return
+      if (selectedStock) return // Don't reload if already selected
+
+      try {
+        const response = await fetch('/api/stocks/005930')
+        const data = await response.json()
+
+        if (data.success && data.data) {
+          setSelectedStock(data.data)
+        }
+      } catch (err) {
+        console.error('Failed to load default stock:', err)
+      }
+    }
+
+    loadDefaultStock()
+  }, [status])
 
   // Calculate chart data with moving averages
   const chartDataWithMA = useMemo(() => {
@@ -139,7 +150,7 @@ export default function TradingPage() {
     }
   }
 
-  // 차트 데이터 로드 (종목 선택 시 또는 기간 변경 시 호출)
+  // 차트 데이터 로드 (종목 선택 시 또는 기간/timeframe 변경 시 호출)
   useEffect(() => {
     const loadChartData = async () => {
       if (!selectedStock) {
@@ -151,7 +162,7 @@ export default function TradingPage() {
 
       try {
         const response = await fetch(
-          `/api/stocks/${selectedStock.stockCode}/chart?days=${chartPeriod}`
+          `/api/stocks/${selectedStock.stockCode}/chart?days=${chartPeriod}&timeframe=${chartTimeframe}`
         )
         const data = await response.json()
 
@@ -169,7 +180,7 @@ export default function TradingPage() {
     }
 
     loadChartData()
-  }, [selectedStock, chartPeriod])
+  }, [selectedStock, chartPeriod, chartTimeframe])
 
   // Enter 키로 검색
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -262,68 +273,6 @@ export default function TradingPage() {
   const calculateTotalAmount = () => {
     if (!selectedStock) return 0
     return selectedStock.currentPrice * tradeQuantity
-  }
-
-  // Custom Candlestick Shape
-  const CandlestickShape = (props: any) => {
-    const { x, y, width, height, open, close, high, low, fill } = props
-
-    const isGreen = close > open
-    const color = isGreen ? '#ef4444' : '#3b82f6' // 빨강(상승) / 파랑(하락)
-    const candleWidth = width * 0.6
-    const candleX = x + (width - candleWidth) / 2
-
-    // Calculate body position
-    const bodyTop = Math.min(open, close)
-    const bodyBottom = Math.max(open, close)
-    const bodyHeight = Math.abs(close - open)
-
-    return (
-      <g>
-        {/* Wick (High-Low line) */}
-        <line
-          x1={x + width / 2}
-          y1={high}
-          x2={x + width / 2}
-          y2={low}
-          stroke={color}
-          strokeWidth={1}
-        />
-        {/* Body */}
-        <rect
-          x={candleX}
-          y={bodyTop}
-          width={candleWidth}
-          height={bodyHeight || 1}
-          fill={color}
-          stroke={color}
-          strokeWidth={1}
-        />
-      </g>
-    )
-  }
-
-  // Custom Tooltip
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (!active || !payload || payload.length === 0) return null
-
-    const data = payload[0].payload
-
-    return (
-      <div className="bg-white border border-gray-300 rounded-lg shadow-lg p-3 text-sm">
-        <p className="font-semibold mb-2">{data.date}</p>
-        <div className="space-y-1">
-          <p>시가: {data.open?.toLocaleString()}원</p>
-          <p>고가: <span className="text-red-600">{data.high?.toLocaleString()}원</span></p>
-          <p>저가: <span className="text-blue-600">{data.low?.toLocaleString()}원</span></p>
-          <p className="font-semibold">종가: {data.close?.toLocaleString()}원</p>
-          <p className="text-gray-600">거래량: {data.volume?.toLocaleString()}주</p>
-          {data.ma5 && <p className="text-red-500">MA5: {data.ma5.toFixed(0).toLocaleString()}원</p>}
-          {data.ma10 && <p className="text-green-500">MA10: {data.ma10.toFixed(0).toLocaleString()}원</p>}
-          {data.ma20 && <p className="text-blue-500">MA20: {data.ma20.toFixed(0).toLocaleString()}원</p>}
-        </div>
-      </div>
-    )
   }
 
   // Show loading state during authentication
@@ -466,23 +415,30 @@ export default function TradingPage() {
           {/* 캔들스틱 차트 */}
           <div className="mb-6 pb-6 border-b">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">가격 차트</h3>
+              <h3 className="text-lg font-semibold">가격 차트 (거래일 90일)</h3>
 
-              {/* 기간 선택 탭 */}
+              {/* 시간프레임 선택 */}
               <div className="flex gap-2">
-                {([7, 30, 90, 365, 1095] as ChartPeriod[]).map((period) => (
-                  <button
-                    key={period}
-                    onClick={() => setChartPeriod(period)}
-                    className={`px-3 py-1 text-sm rounded-lg transition-colors ${
-                      chartPeriod === period
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    {period === 1095 ? '3년' : period === 365 ? '1년' : `${period}일`}
-                  </button>
-                ))}
+                <button
+                  onClick={() => setChartTimeframe('daily')}
+                  className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+                    chartTimeframe === 'daily'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  일봉
+                </button>
+                <button
+                  onClick={() => setChartTimeframe('weekly')}
+                  className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+                    chartTimeframe === 'weekly'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  주봉
+                </button>
               </div>
             </div>
 
@@ -491,110 +447,33 @@ export default function TradingPage() {
                 <div className="text-gray-500">차트 로딩 중...</div>
               </div>
             ) : chartDataWithMA.length > 0 ? (
-              <div className="space-y-4">
-                {/* 캔들스틱 + 이동평균선 차트 */}
-                <ResponsiveContainer width="100%" height={400}>
-                  <ComposedChart data={chartDataWithMA}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis
-                      dataKey="date"
-                      tick={{ fontSize: 11 }}
-                      tickFormatter={(date) => {
-                        const d = new Date(date)
-                        return `${d.getMonth() + 1}/${d.getDate()}`
-                      }}
-                    />
-                    <YAxis
-                      yAxisId="price"
-                      domain={['dataMin - 2000', 'dataMax + 2000']}
-                      tick={{ fontSize: 11 }}
-                      tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend />
-
-                    {/* Moving Averages */}
-                    <Line
-                      yAxisId="price"
-                      type="monotone"
-                      dataKey="ma5"
-                      stroke="#ef4444"
-                      strokeWidth={1.5}
-                      dot={false}
-                      name="MA5"
-                      connectNulls
-                    />
-                    <Line
-                      yAxisId="price"
-                      type="monotone"
-                      dataKey="ma10"
-                      stroke="#10b981"
-                      strokeWidth={1.5}
-                      dot={false}
-                      name="MA10"
-                      connectNulls
-                    />
-                    <Line
-                      yAxisId="price"
-                      type="monotone"
-                      dataKey="ma20"
-                      stroke="#3b82f6"
-                      strokeWidth={1.5}
-                      dot={false}
-                      name="MA20"
-                      connectNulls
-                    />
-
-                    {/* Candlesticks (using Bar as workaround) */}
-                    <Bar
-                      yAxisId="price"
-                      dataKey="high"
-                      shape={<CandlestickShape />}
-                      name="가격"
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
-
-                {/* 거래량 차트 */}
-                <ResponsiveContainer width="100%" height={120}>
-                  <ComposedChart data={chartDataWithMA}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis
-                      dataKey="date"
-                      tick={{ fontSize: 11 }}
-                      tickFormatter={(date) => {
-                        const d = new Date(date)
-                        return `${d.getMonth() + 1}/${d.getDate()}`
-                      }}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 11 }}
-                      tickFormatter={(value) => {
-                        if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`
-                        if (value >= 1000) return `${(value / 1000).toFixed(0)}K`
-                        return value.toString()
-                      }}
-                    />
-                    <Tooltip
-                      formatter={(value: number) => [value.toLocaleString(), '거래량']}
-                      labelFormatter={(date) => date}
-                    />
-                    <Bar dataKey="volume" fill="#94a3b8" name="거래량">
-                      {chartDataWithMA.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={entry.close > entry.open ? '#ef4444' : '#3b82f6'}
-                        />
-                      ))}
-                    </Bar>
-                  </ComposedChart>
-                </ResponsiveContainer>
-
-                <div className="text-sm text-gray-500 text-center">
-                  차트 데이터: {chartDataWithMA.length}일 |
-                  이동평균선: MA5(빨강), MA10(초록), MA20(파랑)
-                </div>
-              </div>
+              <LightweightChart
+                data={chartDataWithMA.map((d) => ({
+                  time: d.date,
+                  open: d.open,
+                  high: d.high,
+                  low: d.low,
+                  close: d.close,
+                }))}
+                volumeData={chartDataWithMA.map((d) => ({
+                  time: d.date,
+                  value: d.volume,
+                  color: d.close > d.open ? '#ef444480' : '#3b82f680',
+                }))}
+                ma5={chartDataWithMA.map((d) => ({
+                  time: d.date,
+                  value: d.ma5 ?? null,
+                }))}
+                ma10={chartDataWithMA.map((d) => ({
+                  time: d.date,
+                  value: d.ma10 ?? null,
+                }))}
+                ma20={chartDataWithMA.map((d) => ({
+                  time: d.date,
+                  value: d.ma20 ?? null,
+                }))}
+                height={520}
+              />
             ) : (
               <div className="h-96 flex items-center justify-center bg-gray-50 rounded-lg">
                 <div className="text-center">

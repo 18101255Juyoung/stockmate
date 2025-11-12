@@ -31,9 +31,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     const { searchParams } = new URL(request.url)
     const period = searchParams.get('period') as PortfolioHistoryOptions['period']
+    const date = searchParams.get('date') // YYYY-MM-DD format for specific date lookup
 
     // Validate period
-    const validPeriods = ['7d', '30d', '90d', '1y', 'all']
+    const validPeriods = ['1d', '7d', '30d', '90d', '1y', 'all']
     if (period && !validPeriods.includes(period)) {
       return NextResponse.json(
         {
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     // Get portfolio history
-    const result = await getPortfolioHistory(session.user.id, { period })
+    const result = await getPortfolioHistory(session.user.id, { period, date })
 
     if (!result.success) {
       const statusCode = result.error?.code === ErrorCodes.NOT_FOUND ? 404 : 500

@@ -8,10 +8,21 @@ import { ApiResponse, ErrorCodes } from '@/lib/types/api'
 
 /**
  * Get public profile by username
+ * Retrieves a user's public profile information including portfolio data and counts
+ *
+ * @param username - Username of the user whose profile to retrieve
+ * @returns User profile data including basic info, portfolio metrics, and social counts (followers, following, posts, transactions)
+ *
+ * @example
+ * const result = await getPublicProfile('john_trader')
+ * if (result.success) {
+ *   console.log(`${result.data.user.displayName}: ${result.data.portfolio.totalReturn}% return`)
+ *   console.log(`${result.data.user.followerCount} followers`)
+ * }
  */
 export async function getPublicProfile(
   username: string
-): Promise<ApiResponse<{ user: any }>> {
+): Promise<ApiResponse<{ user: any; portfolio: any }>> {
   try {
     const user = await prisma.user.findUnique({
       where: { username },
@@ -22,11 +33,23 @@ export async function getPublicProfile(
         bio: true,
         profileImage: true,
         createdAt: true,
+        portfolio: {
+          select: {
+            initialCapital: true,
+            currentCash: true,
+            totalAssets: true,
+            totalReturn: true,
+            realizedPL: true,
+            unrealizedPL: true,
+            updatedAt: true,
+          },
+        },
         _count: {
           select: {
             posts: true,
             followers: true,
             following: true,
+            transactions: true,
           },
         },
       },
@@ -42,9 +65,21 @@ export async function getPublicProfile(
       }
     }
 
+    // Separate user and portfolio data
+    const { portfolio, ...userData } = user
+
     return {
       success: true,
-      data: { user },
+      data: {
+        user: {
+          ...userData,
+          followerCount: userData._count.followers,
+          followingCount: userData._count.following,
+          postCount: userData._count.posts,
+          transactionCount: userData._count.transactions,
+        },
+        portfolio,
+      },
     }
   } catch (error) {
     console.error('Error getting public profile:', error)
@@ -60,6 +95,23 @@ export async function getPublicProfile(
 
 /**
  * Update user profile
+ * Updates a user's profile information (displayName, bio, profileImage)
+ *
+ * @param userId - ID of the user whose profile to update
+ * @param data - Profile fields to update (all optional)
+ * @param data.displayName - New display name (cannot be empty)
+ * @param data.bio - New bio text (empty string sets to null)
+ * @param data.profileImage - New profile image URL (empty string sets to null)
+ * @returns Updated user profile data
+ *
+ * @example
+ * const result = await updateProfile('user123', {
+ *   displayName: 'John the Trader',
+ *   bio: 'Value investor since 2020'
+ * })
+ * if (result.success) {
+ *   console.log('Profile updated:', result.data.user.displayName)
+ * }
  */
 export async function updateProfile(
   userId: string,

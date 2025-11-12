@@ -7,12 +7,42 @@ import { prisma } from '@/lib/prisma'
 import { ApiResponse, ErrorCodes } from '@/lib/types/api'
 
 /**
+ * Calculate return rate from holding data
+ * Return rate = ((currentPrice - avgPrice) / avgPrice) * 100
+ *
+ * @param avgPrice - Average purchase price
+ * @param currentPrice - Current market price
+ * @returns Return rate as percentage
+ */
+function calculateReturnRate(avgPrice: number, currentPrice: number): number {
+  if (avgPrice === 0) return 0
+  return ((currentPrice - avgPrice) / avgPrice) * 100
+}
+
+/**
+ * Validate if claimed return rate matches actual holding return rate
+ * Allows up to 10% difference to account for price fluctuations
+ *
+ * @param claimedRate - Return rate claimed in post
+ * @param actualRate - Actual return rate from holding
+ * @returns true if within acceptable range, false otherwise
+ */
+function isReturnRateValid(claimedRate: number, actualRate: number): boolean {
+  const TOLERANCE_PERCENT = 10
+  const difference = Math.abs(claimedRate - actualRate)
+  return difference <= TOLERANCE_PERCENT
+}
+
+/**
  * Post data for creation
  */
 export interface CreatePostData {
   title: string
   content: string
   imageUrls?: string[]
+  stockCode?: string
+  stockName?: string
+  returnRate?: number
 }
 
 /**
@@ -82,6 +112,44 @@ export async function createPost(
       }
     }
 
+    // Check if holding is verified (auto-verify if stock is selected and actually owned)
+    let isVerified = false
+    if (data.stockCode && data.stockName && data.returnRate !== null && data.returnRate !== undefined) {
+      const holding = await prisma.holding.findFirst({
+        where: {
+          portfolio: { userId },
+          stockCode: data.stockCode,
+        },
+        include: {
+          portfolio: true,
+        },
+      })
+
+      // Auto-verify if:
+      // 1. User actually owns the stock (quantity > 0)
+      // 2. Claimed return rate matches actual holding return rate (within 10% tolerance)
+      if (holding && holding.quantity > 0) {
+        const actualReturnRate = calculateReturnRate(
+          holding.avgPrice,
+          holding.currentPrice
+        )
+
+        // Validate claimed return rate against actual
+        if (isReturnRateValid(data.returnRate, actualReturnRate)) {
+          isVerified = true
+        } else {
+          // Return error if return rate is too different
+          return {
+            success: false,
+            error: {
+              code: ErrorCodes.VALIDATION_INVALID_INPUT,
+              message: `Return rate validation failed. Claimed: ${data.returnRate.toFixed(2)}%, Actual: ${actualReturnRate.toFixed(2)}%. Difference must be within 10%.`,
+            },
+          }
+        }
+      }
+    }
+
     // Create post
     const post = await prisma.post.create({
       data: {
@@ -89,6 +157,10 @@ export async function createPost(
         title: data.title.trim(),
         content: data.content.trim(),
         imageUrls: data.imageUrls || [],
+        stockCode: data.stockCode,
+        stockName: data.stockName,
+        returnRate: data.returnRate,
+        isVerified,
       },
       include: {
         user: {

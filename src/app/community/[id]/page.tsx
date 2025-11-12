@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import VerificationBadge from '@/components/community/VerificationBadge'
 import LikeButton from '@/components/community/LikeButton'
 import CommentList from '@/components/community/CommentList'
@@ -13,6 +14,10 @@ interface Post {
   id: string
   title: string
   content: string
+  imageUrls?: string[]
+  stockCode?: string | null
+  stockName?: string | null
+  returnRate?: number | null
   user: {
     id: string
     username: string
@@ -235,12 +240,50 @@ export default function PostDetailPage() {
           </div>
         </div>
 
+        {/* Holding Badge */}
+        {post.stockCode && post.stockName && post.returnRate != null && (
+          <div className="mb-4">
+            <div
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium ${
+                post.returnRate >= 0
+                  ? 'bg-red-50 text-red-700 border border-red-200'
+                  : 'bg-blue-50 text-blue-700 border border-blue-200'
+              }`}
+            >
+              <span className="font-semibold">{post.stockName}</span>
+              <span className="text-xs text-gray-600">({post.stockCode})</span>
+              <span className="font-bold">
+                {post.returnRate >= 0 ? '+' : ''}
+                {post.returnRate.toFixed(2)}%
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Content */}
         <div className="prose max-w-none mb-6">
           <p className="text-gray-800 whitespace-pre-wrap leading-relaxed">
             {post.content}
           </p>
         </div>
+
+        {/* Images */}
+        {post.imageUrls && post.imageUrls.length > 0 && (
+          <div className="mb-6">
+            <div className={`grid gap-3 ${post.imageUrls.length === 1 ? 'grid-cols-1' : post.imageUrls.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+              {post.imageUrls.map((url, index) => (
+                <div key={index} className="relative w-full h-64 rounded-lg overflow-hidden bg-gray-100">
+                  <Image
+                    src={url}
+                    alt={`${post.title} - 이미지 ${index + 1}`}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex items-center gap-3 pt-6 border-t border-gray-200">

@@ -1,17 +1,19 @@
 /**
  * Stock Chart Data API
- * Returns historical price data (daily candles) for a given stock
+ * Returns historical price data (daily/weekly candles) for a given stock
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { aggregateToWeekly } from '@/lib/utils/chartAggregation'
 
 /**
  * GET /api/stocks/[code]/chart
  * Get historical price data (OHLCV) for chart display
  *
  * Query params:
- * - days: Number of days to fetch (default: 30, max: 1095 = 3 years)
+ * - days: Number of trading days to fetch (default: 90, max: 500)
+ * - timeframe: 'daily' | 'weekly' (default: 'daily')
  */
 export async function GET(
   request: NextRequest,
@@ -20,7 +22,22 @@ export async function GET(
   try {
     const { code } = params
     const { searchParams } = new URL(request.url)
-    const days = Math.min(parseInt(searchParams.get('days') || '30', 10), 1095)
+    const limit = Math.min(parseInt(searchParams.get('days') || '90', 10), 500)
+    const timeframe = searchParams.get('timeframe') || 'daily'
+
+    // Validate timeframe
+    if (timeframe !== 'daily' && timeframe !== 'weekly') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: `Invalid timeframe: ${timeframe}. Must be 'daily' or 'weekly'`,
+          },
+        },
+        { status: 400 }
+      )
+    }
 
     // Verify stock exists
     const stock = await prisma.stock.findUnique({
@@ -41,22 +58,15 @@ export async function GET(
       )
     }
 
-    // Calculate start date
-    const startDate = new Date()
-    startDate.setDate(startDate.getDate() - days)
-    startDate.setHours(0, 0, 0, 0)
-
-    // Fetch price history
-    const priceHistory = await prisma.stockPriceHistory.findMany({
+    // Fetch most recent N trading days (latest records)
+    const priceHistoryDesc = await prisma.stockPriceHistory.findMany({
       where: {
         stockCode: code,
-        date: {
-          gte: startDate,
-        },
       },
       orderBy: {
-        date: 'asc',
+        date: 'desc',
       },
+      take: limit,
       select: {
         date: true,
         openPrice: true,
@@ -67,15 +77,41 @@ export async function GET(
       },
     })
 
-    // Transform to chart format
-    const chartData = priceHistory.map((item) => ({
+    // Reverse to get chronological order (oldest to newest)
+    const priceHistory = priceHistoryDesc.reverse()
+
+    // Transform to chart format (daily candles)
+    const dailyCandles = priceHistory.map((item) => ({
       date: item.date.toISOString().split('T')[0], // YYYY-MM-DD
-      open: item.openPrice,
-      high: item.highPrice,
-      low: item.lowPrice,
-      close: item.closePrice,
+      openPrice: item.openPrice,
+      highPrice: item.highPrice,
+      lowPrice: item.lowPrice,
+      closePrice: item.closePrice,
       volume: Number(item.volume),
     }))
+
+    // Aggregate if timeframe is weekly
+    let chartData
+    if (timeframe === 'weekly') {
+      const weeklyCandles = aggregateToWeekly(dailyCandles)
+      chartData = weeklyCandles.map((item) => ({
+        date: item.date,
+        open: item.openPrice,
+        high: item.highPrice,
+        low: item.lowPrice,
+        close: item.closePrice,
+        volume: item.volume,
+      }))
+    } else {
+      chartData = dailyCandles.map((item) => ({
+        date: item.date,
+        open: item.openPrice,
+        high: item.highPrice,
+        low: item.lowPrice,
+        close: item.closePrice,
+        volume: item.volume,
+      }))
+    }
 
     return NextResponse.json({
       success: true,
@@ -84,9 +120,10 @@ export async function GET(
         stockName: stock.stockName,
         chartData,
         period: {
-          days,
-          startDate: startDate.toISOString().split('T')[0],
-          endDate: new Date().toISOString().split('T')[0],
+          tradingDays: priceHistory.length,
+          timeframe,
+          startDate: priceHistory.length > 0 ? priceHistory[0].date.toISOString().split('T')[0] : null,
+          endDate: priceHistory.length > 0 ? priceHistory[priceHistory.length - 1].date.toISOString().split('T')[0] : null,
         },
       },
     })

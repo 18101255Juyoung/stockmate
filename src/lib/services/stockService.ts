@@ -2,21 +2,25 @@
  * Stock Service
  * Handles stock price queries, search, and caching
  * Uses Local DB for stock data (updated by scheduler)
+ * Falls back to KIS API if data not available in DB
  */
 
 import cache from '@/lib/utils/cache'
 import { prisma } from '@/lib/prisma'
+import { getKISApiClient } from '@/lib/utils/kisApi'
 import {
   StockPrice,
   StockSearchResult,
+  KIS_ENDPOINTS,
+  KIS_TR_IDS,
 } from '@/lib/types/stock'
 
 // Cache TTL: 5 minutes
 const CACHE_TTL_SECONDS = 5 * 60
 
 /**
- * Get current stock price from database
- * Returns cached price data collected by scheduler
+ * Get current stock price from database or KIS API
+ * Returns cached price data from scheduler, falls back to KIS API if not available
  * Results are cached for 5 minutes
  *
  * @param code - Stock code (e.g., "005930" for Samsung)
@@ -32,37 +36,55 @@ export async function getStockPrice(code: string): Promise<StockPrice> {
   }
 
   try {
-    // Get price from database (updated by scheduler)
+    // Try to get price from database (updated by scheduler)
     const stock = await prisma.stock.findUnique({
       where: { stockCode: code },
     })
 
-    if (!stock) {
-      throw new Error(`Stock not available: ${code}. Only top 50 stocks by market cap are supported.`)
+    // If stock exists in DB and has valid price data, use it
+    if (stock && stock.currentPrice > 0 && stock.priceUpdatedAt) {
+      const stockPrice: StockPrice = {
+        stockCode: stock.stockCode,
+        stockName: stock.stockName,
+        currentPrice: stock.currentPrice,
+        changePrice: 0,
+        changeRate: 0,
+        openPrice: stock.openPrice,
+        highPrice: stock.highPrice,
+        lowPrice: stock.lowPrice,
+        volume: Number(stock.volume),
+        updatedAt: stock.priceUpdatedAt || stock.updatedAt,
+      }
+
+      cache.set(cacheKey, stockPrice, CACHE_TTL_SECONDS)
+      return stockPrice
     }
 
-    // Check if price data is available
-    if (stock.currentPrice === 0 || !stock.priceUpdatedAt) {
-      throw new Error(`Price data not available for ${code}. Please wait for next scheduled update.`)
-    }
+    // Fallback to KIS API if stock not in DB or price data missing
+    console.log(`Stock ${code} not in DB, fetching from KIS API...`)
+    const kisClient = getKISApiClient()
 
-    // Calculate change (requires yesterday's close price - for now use 0)
-    // TODO: Implement change calculation using StockPriceHistory
-    const changePrice = 0
-    const changeRate = 0
+    const priceData = await kisClient.callApi<any>(
+      KIS_ENDPOINTS.STOCK_PRICE,
+      {
+        FID_COND_MRKT_DIV_CODE: 'J', // Market (J: KOSPI, Q: KOSDAQ)
+        FID_INPUT_ISCD: code,
+      },
+      KIS_TR_IDS.COMMON.STOCK_PRICE
+    )
 
-    // Transform DB record to StockPrice format
+    // Transform KIS API response to StockPrice format
     const stockPrice: StockPrice = {
-      stockCode: stock.stockCode,
-      stockName: stock.stockName,
-      currentPrice: stock.currentPrice,
-      changePrice,
-      changeRate,
-      openPrice: stock.openPrice,
-      highPrice: stock.highPrice,
-      lowPrice: stock.lowPrice,
-      volume: Number(stock.volume),
-      updatedAt: stock.priceUpdatedAt || stock.updatedAt,
+      stockCode: code,
+      stockName: priceData.hts_kor_isnm || '',
+      currentPrice: parseFloat(priceData.stck_prpr) || 0,
+      changePrice: parseFloat(priceData.prdy_vrss) || 0,
+      changeRate: parseFloat(priceData.prdy_ctrt) || 0,
+      openPrice: parseFloat(priceData.stck_oprc) || 0,
+      highPrice: parseFloat(priceData.stck_hgpr) || 0,
+      lowPrice: parseFloat(priceData.stck_lwpr) || 0,
+      volume: parseInt(priceData.acml_vol) || 0,
+      updatedAt: new Date(),
     }
 
     // Cache the result
@@ -76,8 +98,8 @@ export async function getStockPrice(code: string): Promise<StockPrice> {
 }
 
 /**
- * Search stocks by name or code (DB-based)
- * Searches local database for stock information
+ * Search stocks by name or code (DB or KIS API)
+ * Searches local database first, falls back to KIS API if no results
  * Results are cached for 5 minutes
  *
  * @param query - Search query (stock name or code)
@@ -97,7 +119,7 @@ export async function searchStocks(query: string): Promise<StockSearchResult[]> 
   }
 
   try {
-    // Search in local database
+    // Search in local database first
     const stocks = await prisma.stock.findMany({
       where: {
         OR: [
@@ -111,11 +133,36 @@ export async function searchStocks(query: string): Promise<StockSearchResult[]> 
       },
     })
 
-    // Transform to StockSearchResult format
-    const results: StockSearchResult[] = stocks.map((stock) => ({
-      stockCode: stock.stockCode,
-      stockName: stock.stockName,
-      market: stock.market,
+    // If found in DB, return results
+    if (stocks.length > 0) {
+      const results: StockSearchResult[] = stocks.map((stock) => ({
+        stockCode: stock.stockCode,
+        stockName: stock.stockName,
+        market: stock.market,
+      }))
+
+      cache.set(cacheKey, results, CACHE_TTL_SECONDS)
+      return results
+    }
+
+    // Fallback to KIS API if no results in DB
+    console.log(`No results for "${query}" in DB, searching via KIS API...`)
+    const kisClient = getKISApiClient()
+
+    const searchData = await kisClient.callApi<any[]>(
+      KIS_ENDPOINTS.STOCK_SEARCH,
+      {
+        PRDT_TYPE_CD: '300', // 주식
+        PDNO: query.trim(),
+      },
+      KIS_TR_IDS.COMMON.STOCK_SEARCH
+    )
+
+    // Transform KIS API response to StockSearchResult format
+    const results: StockSearchResult[] = (searchData || []).slice(0, 20).map((item: any) => ({
+      stockCode: item.pdno || '',
+      stockName: item.prdt_name || '',
+      market: item.mket_id_cd === 'J' ? 'KOSPI' : item.mket_id_cd === 'Q' ? 'KOSDAQ' : 'ETC',
     }))
 
     // Cache the results

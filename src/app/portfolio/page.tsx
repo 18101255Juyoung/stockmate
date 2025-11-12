@@ -103,7 +103,7 @@ export default function PortfolioPage() {
     } else if (status === 'authenticated') {
       fetchPortfolio()
     }
-  }, [status, router])
+  }, [status])
 
   // Period 변경 시 히스토리 다시 가져오기
   useEffect(() => {

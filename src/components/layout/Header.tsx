@@ -37,9 +37,12 @@ export default function Header() {
               <div className="px-4 py-2 text-sm text-gray-400">Loading...</div>
             ) : session ? (
               <>
-                <span className="text-sm font-medium">
+                <Link
+                  href={`/profile/${session.user?.username}`}
+                  className="text-sm font-medium hover:text-blue-600 transition-colors"
+                >
                   {session.user?.name || session.user?.email}
-                </span>
+                </Link>
                 <button
                   onClick={() => signOut({ callbackUrl: '/' })}
                   className="px-4 py-2 text-sm text-red-600 hover:text-red-700"

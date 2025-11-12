@@ -43,3 +43,20 @@ next-env.d.ts
 .mcp/*.key
 .mcp/secrets.*
 claude_desktop_config.json
+
+# database backups
+/backups/*.sql
+/backups/*.dump
+
+# debug & test scripts (개발/디버깅용 임시 파일)
+check-*.js
+check-*.mjs
+test-*.js
+test-*.mjs
+debug-*.js
+delete-*.js
+fix-*.js
+regenerate-*.js
+full-*.mjs
+*.html
+nul

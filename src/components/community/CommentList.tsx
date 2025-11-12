@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 
@@ -27,6 +27,11 @@ export default function CommentList({
   const { data: session } = useSession()
   const router = useRouter()
   const [comments, setComments] = useState<Comment[]>(initialComments)
+
+  // Update comments when initialComments changes
+  useEffect(() => {
+    setComments(initialComments)
+  }, [initialComments])
 
   const handleDelete = async (commentId: string) => {
     if (!confirm('댓글을 삭제하시겠습니까?')) {

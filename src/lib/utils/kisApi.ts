@@ -150,6 +150,65 @@ export class KISApiClient {
   }
 
   /**
+   * Call KIS API and return output2 (for chart data endpoints)
+   * Some KIS APIs return data in output2 instead of output
+   */
+  async callApiChart<T = any>(
+    endpoint: string,
+    params: Record<string, string> = {},
+    trId?: string
+  ): Promise<T[]> {
+    // Rate limiting: wait if needed
+    await this.checkRateLimit()
+
+    // Get access token
+    const token = await this.getAccessToken()
+
+    // Build URL with query params
+    const url = new URL(`${this.config.baseUrl}${endpoint}`)
+    Object.entries(params).forEach(([key, value]) => {
+      url.searchParams.append(key, value)
+    })
+
+    // Build headers
+    const headers: KISApiHeaders = {
+      'content-type': 'application/json',
+      authorization: `Bearer ${token}`,
+      appkey: this.config.appKey,
+      appsecret: this.config.appSecret,
+      custtype: 'P', // 개인
+    }
+
+    if (trId) {
+      headers.tr_id = trId
+    }
+
+    try {
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: headers as any,
+      })
+
+      if (!response.ok) {
+        throw new Error(`KIS API request failed: ${response.status} ${response.statusText}`)
+      }
+
+      const data: any = await response.json()
+
+      // Check KIS API error code
+      if (data.rt_cd !== '0') {
+        throw new Error(`KIS API error: [${data.msg_cd}] ${data.msg1}`)
+      }
+
+      // Return output2 for chart data
+      return (data.output2 || []) as T[]
+    } catch (error) {
+      console.error('KIS API chart call failed:', error)
+      throw error
+    }
+  }
+
+  /**
    * Check rate limit and wait if necessary
    * KIS API allows 1 request per second
    */

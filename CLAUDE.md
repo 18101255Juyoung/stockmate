@@ -67,10 +67,22 @@ jest -t "test name"           # Run specific test by name
 ### Database
 ```bash
 npx prisma studio             # Open database GUI
-npx prisma migrate dev        # Create and apply migration
-npx prisma migrate reset      # Reset database (destructive)
-npx prisma db push            # Push schema without migration
+npm run migrate:safe          # RECOMMENDED: Safe migration (backup + migrate + seed)
+npx prisma migrate dev        # Create and apply migration (USE WITH CAUTION)
+npx prisma db push            # Push schema without migration (USE WITH CAUTION)
 ```
+
+### Database Backup & Restore
+```bash
+npm run db:backup             # Create manual backup
+npm run db:restore            # Restore from backup (interactive)
+npm run migrate:safe          # Safe migration: backup → migrate → seed
+```
+
+**Automatic Backups:**
+- Daily at 23:59 (automatically scheduled)
+- Keeps last 7 days of backups
+- Stored in `backups/` directory
 
 ### Code Quality
 ```bash
@@ -260,6 +272,9 @@ newAvgPrice = (oldQuantity × oldAvgPrice + newQuantity × newPrice) / (oldQuant
    - ALL_TIME: Total returns since account creation
 4. Only store top 100 per period
 ```
+
+**⚠️ Current Limitation (Phase 4)**:
+All ranking periods (DAILY/WEEKLY/MONTHLY/ALL_TIME) currently use the same `Portfolio.totalReturn` value, which represents all-time returns. Period-specific calculations require implementing PortfolioHistory tracking, which is planned for Phase 5. Users should be aware that selecting different periods will show the same rankings until this feature is implemented.
 
 ---
 
@@ -509,6 +524,114 @@ REDIS_URL="redis://..."
 │   └── migrations/          # Migration history
 ├── tests/                   # Test files (see Testing Strategy)
 └── public/                  # Static assets
+```
+
+---
+
+## Database Safety Guidelines
+
+### ⚠️ CRITICAL: Preventing Data Loss
+
+**The Problem:**
+Schema changes (especially enum modifications, constraint changes, or relation updates) can cause **COMPLETE DATA LOSS** when using `npx prisma migrate dev` or `npx prisma db push --accept-data-loss`.
+
+**Root Cause:**
+PostgreSQL cannot remove values from enums or change certain constraints without dropping and recreating tables, which **DELETES ALL DATA**.
+
+### ✅ Safe Workflow (ALWAYS USE THIS)
+
+```bash
+# RECOMMENDED: All-in-one safe migration
+npm run migrate:safe
+
+# This command does:
+# 1. Backup database automatically
+# 2. Run prisma migrate dev
+# 3. Run seed:safe to restore test data
+```
+
+### 📦 Manual Backup & Restore
+
+```bash
+# Before making schema changes:
+npm run db:backup              # Create backup
+
+# If something goes wrong:
+npm run db:restore             # Restore from backup (interactive)
+```
+
+### 🔴 DANGEROUS COMMANDS - USE WITH EXTREME CAUTION
+
+**These commands can DELETE ALL DATA:**
+
+1. **`npx prisma migrate dev`** - When:
+   - Removing enum values (e.g., removing DAILY from RankingPeriod)
+   - Changing unique constraints with existing data
+   - Modifying relations (1:1 to 1:N, etc.)
+
+2. **`npx prisma migrate reset`** - ALWAYS deletes everything
+3. **`npx prisma db push --accept-data-loss`** - Bypasses safety checks
+4. **`npm run seed:reset`** - Deletes all data and reseeds
+
+### 🛡️ Protection Mechanisms in Place
+
+1. **Automatic Daily Backups**
+   - Scheduled at 23:59 every day
+   - Keeps last 7 days
+   - Stored in `backups/` directory
+
+2. **Separate Test Database**
+   - Dev DB: `stockmate`
+   - Test DB: `stockmate_test`
+   - Tests never affect dev data
+
+3. **Safe Seed Mode**
+   - Default: `SEED_MODE=safe` (preserves existing data)
+   - Only use `reset` mode when explicitly needed
+
+### 📝 Schema Change Best Practices
+
+**When removing enum values:**
+```typescript
+// ❌ DON'T: Direct removal causes data loss
+enum RankingPeriod {
+  // DAILY  ← Removing this drops the entire table!
+  WEEKLY
+  MONTHLY
+  ALL_TIME
+}
+
+// ✅ DO: Multi-step migration
+// Step 1: Add new enum, migrate data
+// Step 2: Remove old enum in separate migration
+// OR: Use lookup tables instead of enums for frequently changing data
+```
+
+**When changing constraints:**
+```bash
+# Before: @@unique([userId])
+# After: @@unique([userId, period])
+
+# Safe approach:
+1. npm run db:backup           # Backup first
+2. npm run migrate:safe        # Apply change
+3. Verify data still exists
+```
+
+### 🚨 If Data Loss Occurs
+
+```bash
+# Step 1: Stay calm - you have backups!
+npm run db:restore
+
+# Step 2: Select backup from list
+# The most recent backup is usually #1
+
+# Step 3: Regenerate Prisma Client
+npx prisma generate
+
+# Step 4: Restart dev server
+npm run dev
 ```
 
 ---

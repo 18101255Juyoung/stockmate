@@ -79,6 +79,10 @@ describe('PostService', () => {
           title: '삼성전자 매수 후기',
           content: '오늘 삼성전자 100주 매수했습니다.',
           imageUrls: [],
+          stockCode: undefined,
+          stockName: undefined,
+          returnRate: undefined,
+          isVerified: false,
         },
         include: {
           user: {

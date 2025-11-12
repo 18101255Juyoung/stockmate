@@ -5,12 +5,12 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 
 interface FollowButtonProps {
-  userId: string
+  username: string
   initialIsFollowing: boolean
 }
 
 export default function FollowButton({
-  userId,
+  username,
   initialIsFollowing,
 }: FollowButtonProps) {
   const { data: session } = useSession()
@@ -28,9 +28,9 @@ export default function FollowButton({
 
     try {
       const url = isFollowing
-        ? `/api/users/${userId}/unfollow`
-        : `/api/users/${userId}/follow`
-      const method = isFollowing ? 'DELETE' : 'POST'
+        ? `/api/users/${username}/unfollow`
+        : `/api/users/${username}/follow`
+      const method = 'POST'
 
       const res = await fetch(url, { method })
 

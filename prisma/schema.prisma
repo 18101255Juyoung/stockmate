@@ -23,12 +23,14 @@ model User {
   updatedAt    DateTime  @updatedAt
 
   // Relations
-  portfolio    Portfolio?
-  transactions Transaction[]
-  posts        Post[]
-  comments     Comment[]
-  likes        Like[]
-  ranking      Ranking?
+  portfolio          Portfolio?
+  transactions       Transaction[]
+  posts              Post[]
+  comments           Comment[]
+  likes              Like[]
+  rankings           Ranking[]
+  aiAnalyses         AIAnalysis[]  // Deprecated: Use portfolioAnalyses instead
+  portfolioAnalyses  PortfolioAnalysis[]
 
   // Self-referential follow relationship
   followers    Follow[]  @relation("UserFollowers")
@@ -55,6 +57,7 @@ model Portfolio {
 
   // Relations
   holdings      Holding[]
+  snapshots     PortfolioSnapshot[]
 
   @@map("portfolios")
 }
@@ -115,6 +118,11 @@ model Post {
   title       String
   content     String   @db.Text
   imageUrls   String[] @default([])
+
+  // Featured holding (single stock from user's portfolio)
+  stockCode   String?  // Stock ticker (e.g., "005930")
+  stockName   String?  // Stock name (e.g., "삼성전자")
+  returnRate  Float?   // Return rate at post time (e.g., 5.23)
 
   isVerified  Boolean  @default(false) // Auto-verified if linked to real transactions
   linkedTransactionIds String[] @default([])
@@ -185,7 +193,7 @@ model Follow {
 // Ranking model - Leaderboard entries
 model Ranking {
   id          String       @id @default(cuid())
-  userId      String       @unique
+  userId      String
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   rank        Int
@@ -194,12 +202,12 @@ model Ranking {
 
   updatedAt   DateTime     @updatedAt
 
+  @@unique([userId, period])
   @@unique([period, rank])
   @@map("rankings")
 }
 
 enum RankingPeriod {
-  DAILY
   WEEKLY
   MONTHLY
   ALL_TIME
@@ -249,4 +257,117 @@ model StockPriceHistory {
   @@unique([stockCode, date]) // Prevent duplicate entries for same stock on same day
   @@index([stockCode, date])  // Optimize queries by stock and date range
   @@map("stock_price_history")
+}
+
+// PortfolioSnapshot model - Daily portfolio state for period-based ranking
+model PortfolioSnapshot {
+  id           String    @id @default(cuid())
+  portfolioId  String
+  portfolio    Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  date         DateTime  @db.Date // 스냅샷 날짜 (Date only, no time)
+  totalAssets  Float     // 해당 날짜의 총 자산
+  totalReturn  Float     // 해당 날짜의 총 수익률 (%)
+  currentCash  Float     // 해당 날짜의 현금 보유액
+
+  createdAt    DateTime  @default(now())
+
+  // Relations
+  portfolioAnalyses PortfolioAnalysis[]
+
+  @@unique([portfolioId, date]) // Prevent duplicate snapshots for same portfolio on same day
+  @@index([portfolioId, date(sort: Desc)]) // Optimize queries for period-based calculations
+  @@map("portfolio_snapshots")
+}
+
+// AIAnalysis model - AI-generated portfolio analysis and investment advice
+model AIAnalysis {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  analysisType String   // "daily_journal" | "portfolio" | "stock" | "transaction"
+
+  // AI 분석 내용
+  response     String   @db.Text  // 전체 분석 내용 (상세)
+  summary      String   @db.Text  // 3줄 요약 (일지 카드 표시용)
+
+  // 비용 추적
+  tokensUsed   Int      // 사용된 토큰 수
+  cost         Float    // 실제 비용 (USD)
+  model        String   @default("gpt-5-nano")  // 사용한 모델
+
+  // 분석 대상 날짜
+  analysisDate DateTime @db.Date  // 분석 대상 날짜 (KST 기준, Date only)
+
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, analysisDate]) // 사용자당 하루 1회만
+  @@index([userId, analysisDate(sort: Desc)]) // 날짜 내림차순 조회 최적화
+  @@index([analysisType]) // 타입별 조회 최적화
+  @@map("ai_analyses")
+}
+
+// MarketAnalysis model - Daily market-wide analysis (shared by all users)
+model MarketAnalysis {
+  id           String   @id @default(cuid())
+
+  // 분석 날짜 (하루 1회만)
+  date         DateTime @unique @db.Date  // 분석 날짜 (KST 기준, Date only)
+
+  // 시장 데이터 (JSON 형태로 저장)
+  marketData   Json     // KOSPI, KOSDAQ, 업종별 데이터, 외국인 매매 등
+
+  // AI 분석 내용
+  analysis     String   @db.Text  // 전체 시장 분석 (상세)
+  summary      String   @db.Text  // 3줄 요약 (카드 표시용)
+
+  // 비용 추적
+  tokensUsed   Int      // 사용된 토큰 수
+  cost         Float    // 실제 비용 (USD)
+  model        String   @default("gpt-5-nano")  // 사용한 모델
+
+  createdAt    DateTime @default(now())
+
+  @@index([date(sort: Desc)]) // 날짜 내림차순 조회 최적화
+  @@map("market_analyses")
+}
+
+// PortfolioAnalysis model - Unified daily portfolio analysis (16:00)
+// 거래 여부와 무관하게 매일 생성되는 통합 분석
+// 거래가 있으면 거래 평가 포함, 없으면 포트폴리오 진단만
+model PortfolioAnalysis {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 분석 날짜
+  date        DateTime @db.Date
+
+  // 스냅샷 참조 (15:40에 생성된 것)
+  snapshotId  String?
+  snapshot    PortfolioSnapshot? @relation(fields: [snapshotId], references: [id], onDelete: SetNull)
+
+  // 계산된 통계 (JSON 형태로 저장)
+  metrics     Json  // totalAssets, totalReturn, dayChange, holdings, sectorWeights 등
+
+  // AI 분석 내용
+  summary     String   @db.Text  // 3줄 요약 (카드 표시용)
+  analysis    String   @db.Text  // 전체 분석 내용 (상세)
+
+  // 오늘 거래 정보
+  hasTransactions Boolean  @default(false) // 거래 여부
+  transactionIds  Json?    // 거래 ID 배열 (있을 경우)
+
+  // 비용 추적
+  tokensUsed  Int      // 사용된 토큰 수
+  cost        Float    // 실제 비용 (USD)
+  model       String   @default("gpt-5-nano")  // 사용한 모델
+
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, date]) // 사용자당 하루 1회만
+  @@index([userId, date(sort: Desc)]) // 날짜 내림차순 조회 최적화
+  @@index([date]) // 날짜별 조회 최적화
+  @@map("portfolio_analyses")
 }

@@ -9,6 +9,7 @@ const createJestConfig = nextJest({
 const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   testEnvironment: 'node', // Use node for all tests (API, services, database)
+  maxWorkers: 1, // Run tests sequentially to avoid database conflicts
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },

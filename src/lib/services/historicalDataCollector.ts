@@ -62,11 +62,14 @@ export async function fetchHistoricalData(
       FID_ORG_ADJ_PRC: '0', // 0: 수정주가 반영하지 않음, 1: 수정주가 반영
     }
 
-    // Note: DAILY_CHART endpoint returns data in output2, not output
-    // We'll use the callApi method but it returns output, so we need workaround
-    // For now, return empty array - the chart will work with daily candles from scheduler
-    // TODO: Modify KISApiClient to support accessing output2
-    return []
+    // Use callApiChart to access output2
+    const histData: KISChartDataItem[] = await client.callApiChart<KISChartDataItem>(
+      KIS_ENDPOINTS.DAILY_CHART,
+      params,
+      trId
+    )
+
+    return histData
   } catch (error) {
     console.error(`Failed to fetch historical data for ${stockCode}:`, error)
     throw error
@@ -89,12 +92,12 @@ async function saveHistoricalData(
   for (const item of histData) {
     try {
       // Parse date (YYYYMMDD -> Date object)
+      // Use UTC to avoid timezone conversion issues
       const dateStr = item.stck_bsop_date
       const year = parseInt(dateStr.substring(0, 4))
       const month = parseInt(dateStr.substring(4, 6)) - 1 // 0-indexed
       const day = parseInt(dateStr.substring(6, 8))
-      const date = new Date(year, month, day)
-      date.setHours(0, 0, 0, 0)
+      const date = new Date(Date.UTC(year, month, day, 0, 0, 0, 0))
 
       // Parse prices and volume
       const openPrice = parseFloat(item.stck_oprc) || 0

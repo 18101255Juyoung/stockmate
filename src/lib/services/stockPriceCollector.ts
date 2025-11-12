@@ -8,6 +8,7 @@
 import { prisma } from '@/lib/prisma'
 import { getKISApiClient } from '@/lib/utils/kisApi'
 import { KIS_ENDPOINTS, KISStockPriceOutput } from '@/lib/types/stock'
+import { getKSTToday, isMarketOpen as checkMarketOpen } from '@/lib/utils/timezone'
 
 interface StockUpdateResult {
   success: number
@@ -132,15 +133,25 @@ export async function createDailyCandles(): Promise<number> {
 
     console.log(`  Found ${stocks.length} stocks with price data`)
 
-    // Get today's date (date only, no time)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    // Get today's date in KST (date only, no time)
+    const today = getKSTToday()
 
     let createdCount = 0
 
     // Create daily candle for each stock
     for (const stock of stocks) {
       try {
+        // Skip if any critical price is 0 (invalid/incomplete data)
+        if (
+          stock.openPrice === 0 ||
+          stock.highPrice === 0 ||
+          stock.lowPrice === 0 ||
+          stock.currentPrice === 0
+        ) {
+          console.log(`  ⚠️  Skipping ${stock.stockCode} (${stock.stockName}): incomplete OHLC data`)
+          continue
+        }
+
         // Use upsert to avoid duplicates (in case this runs multiple times)
         await prisma.stockPriceHistory.upsert({
           where: {
@@ -185,6 +196,93 @@ export async function createDailyCandles(): Promise<number> {
 }
 
 /**
+ * Update today's candles with current price data
+ * Should be called during market hours to show real-time intraday chart
+ * Creates or updates today's candle in StockPriceHistory
+ *
+ * @returns Number of candles updated
+ */
+export async function updateTodayCandles(): Promise<number> {
+  console.log('📊 Updating today\'s candles...')
+
+  try {
+    // Get today's date in KST (date only, no time)
+    const today = getKSTToday()
+
+    // Get all stocks with price data
+    const stocks = await prisma.stock.findMany({
+      where: {
+        currentPrice: { gt: 0 }, // Only stocks with valid prices
+      },
+      select: {
+        stockCode: true,
+        stockName: true,
+        openPrice: true,
+        highPrice: true,
+        lowPrice: true,
+        currentPrice: true,
+        volume: true,
+      },
+    })
+
+    let updatedCount = 0
+
+    // Update today's candle for each stock
+    for (const stock of stocks) {
+      try {
+        // Skip if any critical price is 0
+        if (
+          stock.openPrice === 0 ||
+          stock.highPrice === 0 ||
+          stock.lowPrice === 0 ||
+          stock.currentPrice === 0
+        ) {
+          continue
+        }
+
+        // Upsert today's candle (create or update)
+        await prisma.stockPriceHistory.upsert({
+          where: {
+            stockCode_date: {
+              stockCode: stock.stockCode,
+              date: today,
+            },
+          },
+          update: {
+            // Keep openPrice unchanged (fixed at market open)
+            highPrice: stock.highPrice,
+            lowPrice: stock.lowPrice,
+            closePrice: stock.currentPrice, // Real-time close price
+            volume: stock.volume,
+          },
+          create: {
+            stockCode: stock.stockCode,
+            date: today,
+            openPrice: stock.openPrice,
+            highPrice: stock.highPrice,
+            lowPrice: stock.lowPrice,
+            closePrice: stock.currentPrice,
+            volume: stock.volume,
+          },
+        })
+
+        updatedCount++
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        console.error(`  ✗ ${stock.stockCode}: ${errorMessage}`)
+      }
+    }
+
+    console.log(`  ✅ Today's candles updated: ${updatedCount}`)
+
+    return updatedCount
+  } catch (error) {
+    console.error('❌ Failed to update today\'s candles:', error)
+    throw error
+  }
+}
+
+/**
  * Get last update time for a specific stock
  *
  * @param stockCode - Stock code
@@ -202,27 +300,10 @@ export async function getLastUpdateTime(stockCode: string): Promise<Date | null>
 /**
  * Check if market is currently open
  * Korean stock market hours: 09:00-15:30 KST, Monday-Friday
+ * Re-exported from timezone utility for backward compatibility
  *
  * @returns true if market is open
  */
 export function isMarketOpen(): boolean {
-  const now = new Date()
-  const kstOffset = 9 * 60 // KST is UTC+9
-  const kstTime = new Date(now.getTime() + kstOffset * 60 * 1000)
-
-  const dayOfWeek = kstTime.getUTCDay() // 0 = Sunday, 6 = Saturday
-  const hours = kstTime.getUTCHours()
-  const minutes = kstTime.getUTCMinutes()
-  const timeInMinutes = hours * 60 + minutes
-
-  // Check if weekday (Monday-Friday)
-  if (dayOfWeek === 0 || dayOfWeek === 6) {
-    return false
-  }
-
-  // Check if market hours (09:00-15:30)
-  const marketOpen = 9 * 60 // 09:00
-  const marketClose = 15 * 60 + 30 // 15:30
-
-  return timeInMinutes >= marketOpen && timeInMinutes <= marketClose
+  return checkMarketOpen()
 }

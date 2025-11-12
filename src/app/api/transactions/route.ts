@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0', 10)
     const stockCode = searchParams.get('stockCode')
     const type = searchParams.get('type') // BUY or SELL
+    const date = searchParams.get('date') // YYYY-MM-DD format
 
     // Build where clause
     const where: any = {
@@ -45,6 +46,18 @@ export async function GET(request: NextRequest) {
 
     if (type && (type === 'BUY' || type === 'SELL')) {
       where.type = type
+    }
+
+    // Filter by date if provided
+    if (date) {
+      const startDate = new Date(date)
+      const endDate = new Date(date)
+      endDate.setDate(endDate.getDate() + 1)
+
+      where.createdAt = {
+        gte: startDate,
+        lt: endDate,
+      }
     }
 
     // Get transactions

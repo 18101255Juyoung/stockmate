@@ -76,13 +76,16 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json()
-    const { title, content, imageUrls } = body
+    const { title, content, imageUrls, stockCode, stockName, returnRate } = body
 
     // Create post
     const result = await createPost(session.user.id, {
       title,
       content,
       imageUrls,
+      stockCode,
+      stockName,
+      returnRate,
     })
 
     if (!result.success) {

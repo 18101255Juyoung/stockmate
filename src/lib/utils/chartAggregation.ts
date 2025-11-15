@@ -51,13 +51,8 @@ function getISOWeek(date: Date): { year: number; week: number } {
   // Create date object in UTC using KST components
   const d = new Date(Date.UTC(kstYear, kstMonth, kstDay))
 
-  // Get day of week in KST
-  const kstDayOfWeek = parseInt(
-    date.toLocaleDateString('en-US', {
-      timeZone: 'Asia/Seoul',
-      weekday: 'numeric',
-    })
-  )
+  // Get day of week in KST (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+  const kstDayOfWeek = d.getUTCDay()
 
   // Set to nearest Thursday: current date + 4 - current day number
   // Make Sunday's day number 7

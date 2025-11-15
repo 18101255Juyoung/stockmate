@@ -44,17 +44,14 @@ export async function POST(request: NextRequest) {
     const result = await generateMarketAnalysis(targetDate)
 
     console.log('✅ Market analysis regenerated successfully')
-    console.log(`  KOSPI: ${result.marketData.indices.kospi.value}`)
-    console.log(`  KOSDAQ: ${result.marketData.indices.kosdaq.value}`)
-    console.log(`  Sectors: ${result.marketData.sectors.length} items`)
+    console.log(`  Date: ${result.date}`)
+    console.log(`  Analysis generated`)
 
     return NextResponse.json({
       success: true,
       data: {
         date: result.date,
-        kospi: result.marketData.indices.kospi.value,
-        kosdaq: result.marketData.indices.kosdaq.value,
-        sectors: result.marketData.sectors.length,
+        message: 'Market analysis generated successfully',
       },
     })
   } catch (error: any) {

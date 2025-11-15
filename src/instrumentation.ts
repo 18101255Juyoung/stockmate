@@ -53,6 +53,10 @@ export async function register() {
             const minutes = kstTime.getMinutes()
             const timeInMinutes = hour * 60 + minutes
 
+            // Import KSTDate for date operations
+            const { KSTDate } = await import('@/lib/utils/kst-date')
+            const today = KSTDate.today()
+
             console.log(`  Current KST time: ${hour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`)
 
             // Market hours: 09:00-15:30
@@ -76,10 +80,8 @@ export async function register() {
 
               // Task 2: Market Analysis (15:35 이후면 생성)
               if (timeInMinutes >= 15 * 60 + 35) {
-                const { KSTDate } = await import('@/lib/utils/kst-date')
                 const { prisma } = await import('@/lib/prisma')
 
-                const today = KSTDate.today()
                 const existingAnalysis = await prisma.marketAnalysis.findUnique({
                   where: { date: today }
                 })
@@ -98,7 +100,7 @@ export async function register() {
               if (timeInMinutes >= 15 * 60 + 40) {
                 console.log('  📸 Creating portfolio snapshots...')
                 const { createAllDailySnapshots } = await import('@/lib/services/portfolioSnapshotService')
-                await createAllDailySnapshots(kstTime)
+                await createAllDailySnapshots(today)
                 console.log('  ✅ Snapshots created')
               }
 
@@ -106,7 +108,7 @@ export async function register() {
               if (timeInMinutes >= 16 * 60) {
                 console.log('  📊 Generating portfolio analysis...')
                 const { generateDailyPortfolioAnalysisForAllUsers } = await import('@/lib/services/portfolioAnalysisService')
-                await generateDailyPortfolioAnalysisForAllUsers(kstTime)
+                await generateDailyPortfolioAnalysisForAllUsers(today)
                 console.log('  ✅ Portfolio analysis completed')
               }
 

@@ -49,7 +49,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     // Get portfolio history
-    const result = await getPortfolioHistory(session.user.id, { period, date })
+    const result = await getPortfolioHistory(session.user.id, { period, date: date || undefined })
 
     if (!result.success) {
       const statusCode = result.error?.code === ErrorCodes.NOT_FOUND ? 404 : 500

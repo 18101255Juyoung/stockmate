@@ -115,10 +115,6 @@ export async function calculatePeriodReturn(
     let startDate: KSTDateType | null = null
 
     switch (period) {
-      case RankingPeriod.DAILY:
-        // 1 day ago
-        startDate = KSTDate.addDays(now, -1)
-        break
       case RankingPeriod.WEEKLY:
         // 7 days ago
         startDate = KSTDate.addDays(now, -7)

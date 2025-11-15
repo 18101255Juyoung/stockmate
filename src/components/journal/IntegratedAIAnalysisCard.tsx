@@ -161,7 +161,7 @@ export default function IntegratedAIAnalysisCard({
               <div className="bg-white rounded-lg p-4 shadow-sm">
                 <h5 className="text-sm font-semibold text-gray-700 mb-3">업종별 흐름</h5>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {sectorsArray.map((sector, index) => (
+                  {sectorsArray.map((sector: any, index) => (
                     <div
                       key={index}
                       className="flex items-center justify-between bg-gray-50 rounded px-3 py-2"

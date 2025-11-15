@@ -461,7 +461,7 @@ export async function safeSeed() {
 
     // Create rankings
     console.log('🏆 Creating rankings...')
-    const periods = ['DAILY', 'WEEKLY', 'MONTHLY', 'ALL_TIME'] as const
+    const periods = ['WEEKLY', 'MONTHLY', 'ALL_TIME'] as const
     const sortedUsers = [...users].sort(
       (a, b) => b.portfolio!.totalReturn - a.portfolio!.totalReturn
     )

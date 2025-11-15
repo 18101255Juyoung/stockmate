@@ -21,6 +21,13 @@ interface Post {
   createdAt: string
 }
 
+interface PaginationInfo {
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+}
+
 export default function CommunityPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -28,27 +35,38 @@ export default function CommunityPage() {
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [filter, setFilter] = useState<'all' | 'verified'>('all')
+  const [filter, setFilter] = useState<'all' | 'verified' | 'stock_recommendation'>('all')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pagination, setPagination] = useState<PaginationInfo>({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 1,
+  })
 
   useEffect(() => {
     fetchPosts()
-  }, [filter])
+  }, [filter, currentPage])
 
   const fetchPosts = async () => {
     setLoading(true)
     setError(null)
 
     try {
-      const url =
-        filter === 'verified'
-          ? '/api/posts?isVerified=true&limit=20'
-          : '/api/posts?limit=20'
+      let url = `/api/posts?limit=20&page=${currentPage}`
+
+      if (filter === 'verified') {
+        url += '&isVerified=true'
+      } else if (filter === 'stock_recommendation') {
+        url += '&hasStock=true'
+      }
 
       const response = await fetch(url)
       const data = await response.json()
 
       if (data.success) {
         setPosts(data.data.posts)
+        setPagination(data.data.pagination)
       } else {
         setError(data.error?.message || '게시글을 불러오는데 실패했습니다')
       }
@@ -60,8 +78,94 @@ export default function CommunityPage() {
     }
   }
 
+  const handleFilterChange = (newFilter: 'all' | 'verified' | 'stock_recommendation') => {
+    setFilter(newFilter)
+    setCurrentPage(1) // Reset to first page when filter changes
+  }
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const renderPagination = () => {
+    if (pagination.totalPages <= 1) return null
+
+    const pages = []
+    const maxPagesToShow = 5
+    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2))
+    let endPage = Math.min(pagination.totalPages, startPage + maxPagesToShow - 1)
+
+    // Adjust startPage if we're near the end
+    if (endPage - startPage + 1 < maxPagesToShow) {
+      startPage = Math.max(1, endPage - maxPagesToShow + 1)
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i)
+    }
+
+    return (
+      <div className="flex justify-center items-center gap-2 mt-8">
+        <button
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          ◀ 이전
+        </button>
+
+        {startPage > 1 && (
+          <>
+            <button
+              onClick={() => handlePageChange(1)}
+              className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            >
+              1
+            </button>
+            {startPage > 2 && <span className="px-2 text-gray-500">...</span>}
+          </>
+        )}
+
+        {pages.map((page) => (
+          <button
+            key={page}
+            onClick={() => handlePageChange(page)}
+            className={`px-3 py-2 text-sm font-medium rounded-md ${
+              currentPage === page
+                ? 'bg-blue-600 text-white'
+                : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            {page}
+          </button>
+        ))}
+
+        {endPage < pagination.totalPages && (
+          <>
+            {endPage < pagination.totalPages - 1 && <span className="px-2 text-gray-500">...</span>}
+            <button
+              onClick={() => handlePageChange(pagination.totalPages)}
+              className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            >
+              {pagination.totalPages}
+            </button>
+          </>
+        )}
+
+        <button
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={currentPage === pagination.totalPages}
+          className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          다음 ▶
+        </button>
+      </div>
+    )
+  }
+
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="container mx-auto px-4 py-8 max-w-6xl">
       {/* Header */}
       <div className="mb-8 flex justify-between items-center">
         <div>
@@ -82,7 +186,7 @@ export default function CommunityPage() {
       <div className="mb-6 border-b border-gray-200">
         <div className="flex gap-4">
           <button
-            onClick={() => setFilter('all')}
+            onClick={() => handleFilterChange('all')}
             className={`pb-3 px-2 font-medium transition-colors ${
               filter === 'all'
                 ? 'text-blue-600 border-b-2 border-blue-600'
@@ -92,14 +196,14 @@ export default function CommunityPage() {
             전체
           </button>
           <button
-            onClick={() => setFilter('verified')}
+            onClick={() => handleFilterChange('verified')}
             className={`pb-3 px-2 font-medium transition-colors ${
               filter === 'verified'
                 ? 'text-blue-600 border-b-2 border-blue-600'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            인증됨
+            인증글
           </button>
         </div>
       </div>
@@ -120,11 +224,16 @@ export default function CommunityPage() {
 
       {/* Posts List */}
       {!loading && !error && posts.length > 0 && (
-        <div className="space-y-4">
-          {posts.map((post) => (
-            <PostCard key={post.id} post={post} currentUserId={session?.user?.id} />
-          ))}
-        </div>
+        <>
+          <div className="border rounded-lg bg-white overflow-hidden">
+            {posts.map((post) => (
+              <PostCard key={post.id} post={post} currentUserId={session?.user?.id} />
+            ))}
+          </div>
+
+          {/* Pagination */}
+          {renderPagination()}
+        </>
       )}
 
       {/* Empty State */}
@@ -147,4 +256,3 @@ export default function CommunityPage() {
     </div>
   )
 }
-

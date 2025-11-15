@@ -9,7 +9,8 @@
 
 import OpenAI from 'openai'
 import { prisma } from '@/lib/prisma'
-import { toKSTDateOnly } from '@/lib/utils/timezone'
+import { KSTDate, type KSTDate as KSTDateType } from '@/lib/utils/kst-date'
+import { DateQuery } from '@/lib/db/queries'
 import { collectMarketData, formatMarketDataForAI, type MarketData } from './marketDataService'
 
 // OpenAI 클라이언트 초기화
@@ -32,7 +33,7 @@ export async function generateDailyAnalysis(userId: string, date: Date) {
     }
 
     // 2. 이미 분석이 존재하는지 확인 (중복 방지)
-    const analysisDate = toKSTDateOnly(date)
+    const analysisDate = KSTDate.fromDate(date)
     const existing = await prisma.aIAnalysis.findUnique({
       where: {
         userId_analysisDate: {
@@ -57,10 +58,7 @@ export async function generateDailyAnalysis(userId: string, date: Date) {
         },
         transactions: {
           where: {
-            createdAt: {
-              gte: new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0),
-              lt: new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1, 0, 0, 0),
-            },
+            createdAt: DateQuery.onDate(analysisDate),
           },
           orderBy: { createdAt: 'desc' },
         },
@@ -139,13 +137,11 @@ export async function checkDayTransactions(
   userId: string,
   date: Date
 ): Promise<boolean> {
+  const kstDate = KSTDate.fromDate(date)
   const count = await prisma.transaction.count({
     where: {
       userId,
-      createdAt: {
-        gte: new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0),
-        lt: new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1, 0, 0, 0),
-      },
+      createdAt: DateQuery.onDate(kstDate),
     },
   })
 
@@ -294,7 +290,7 @@ export function calculateCost(usage: any): number {
  */
 export async function generateMarketAnalysis(date: Date) {
   try {
-    const analysisDate = toKSTDateOnly(date)
+    const analysisDate = KSTDate.fromDate(date)
 
     // 1. 이미 분석이 존재하는지 확인
     const existing = await prisma.marketAnalysis.findUnique({
@@ -384,7 +380,7 @@ export async function generatePersonalizedAnalysis(
   marketAnalysis: any
 ) {
   try {
-    const analysisDate = toKSTDateOnly(date)
+    const analysisDate = KSTDate.fromDate(date)
 
     // 1. 이미 분석이 존재하는지 확인
     const existing = await prisma.aIAnalysis.findUnique({
@@ -408,10 +404,7 @@ export async function generatePersonalizedAnalysis(
         },
         transactions: {
           where: {
-            createdAt: {
-              gte: new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0),
-              lt: new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1, 0, 0, 0),
-            },
+            createdAt: DateQuery.onDate(analysisDate),
           },
           orderBy: { createdAt: 'desc' },
         },
@@ -555,7 +548,7 @@ function buildPersonalizedContext(user: any, date: Date, marketAnalysis: any): s
  */
 export async function generateDailyAnalysisForAllUsers() {
   try {
-    const today = toKSTDateOnly(new Date())
+    const today = KSTDate.today()
 
     console.log(`\n🤖 [AI Pipeline] Starting 2-stage analysis for ${today.toISOString()}...`)
 

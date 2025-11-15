@@ -201,6 +201,10 @@ export default function JournalListPage() {
         <p className="text-gray-600">
           날짜를 클릭하면 상세 분석을 확인할 수 있습니다
         </p>
+        <p className="text-sm text-blue-600 mt-1 flex items-center gap-1">
+          <span>💡</span>
+          <span>매일 16:00에 자동으로 AI 분석이 제공됩니다 (거래일 기준)</span>
+        </p>
         {allData.length > 0 && (
           <p className="text-sm text-gray-500 mt-2">
             총 {allData.length}개의 기록 (페이지 {currentPage} / {totalPages})

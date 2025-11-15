@@ -62,6 +62,7 @@ export interface GetPostsOptions {
   limit?: number
   userId?: string
   isVerified?: boolean
+  hasStock?: boolean
 }
 
 /**
@@ -297,6 +298,10 @@ export async function getPosts(
 
     if (options.isVerified !== undefined) {
       where.isVerified = options.isVerified
+    }
+
+    if (options.hasStock !== undefined && options.hasStock === true) {
+      where.stockCode = { not: null }
     }
 
     // Get posts with pagination

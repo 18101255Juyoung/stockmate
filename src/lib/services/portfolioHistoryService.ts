@@ -1,13 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { ApiResponse, ErrorCodes } from '@/lib/types/api'
-import {
-  getKSTToday,
-  getKSTYesterday,
-  toKSTDateOnly,
-  addKSTDays,
-  isAfterKSTTime,
-  getDateKey
-} from '@/lib/utils/timezone'
+import { KSTDate, KSTDateTime, type KSTDate as KSTDateType } from '@/lib/utils/kst-date'
+import { DateQuery } from '@/lib/db/queries'
 
 /**
  * Portfolio history data point
@@ -67,32 +61,32 @@ export async function getPortfolioHistory(
     }
 
     // 2. Calculate date range based on period
-    const now = new Date()
-    let startDate: Date | undefined
-    let specificDate: Date | undefined
+    const now = KSTDate.today()
+    let startDate: KSTDateType | undefined
+    let specificDate: KSTDateType | undefined
 
     // If date parameter is provided with 1d period, we're looking for a specific date
     if (period === '1d' && date) {
-      specificDate = new Date(date)
+      specificDate = KSTDate.parse(date)
       startDate = specificDate
     } else {
       switch (period) {
         case '1d':
           // Single day without specific date - use today
-          specificDate = toKSTDateOnly(now)
+          specificDate = now
           startDate = specificDate
           break
         case '7d':
-          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+          startDate = KSTDate.addDays(now, -7)
           break
         case '30d':
-          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+          startDate = KSTDate.addDays(now, -30)
           break
         case '90d':
-          startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+          startDate = KSTDate.addDays(now, -90)
           break
         case '1y':
-          startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+          startDate = KSTDate.addDays(now, -365)
           break
         case 'all':
           startDate = undefined
@@ -114,14 +108,11 @@ export async function getPortfolioHistory(
 
     // 4. If no transactions, fill with initial capital from creation to today
     if (transactions.length === 0) {
-      const portfolioCreationDate = new Date(user.portfolio.createdAt)
-      portfolioCreationDate.setHours(0, 0, 0, 0)
-
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
+      const portfolioCreationDate = KSTDate.fromDate(user.portfolio.createdAt)
+      const today = KSTDate.today()
 
       const history: PortfolioHistoryPoint[] = []
-      const currentDate = new Date(portfolioCreationDate)
+      let currentDate = portfolioCreationDate
 
       while (currentDate <= today) {
         // Only include if within period filter
@@ -129,14 +120,14 @@ export async function getPortfolioHistory(
 
         if (shouldInclude) {
           history.push({
-            date: new Date(currentDate),
+            date: currentDate,
             cash: Math.round(user.portfolio.initialCapital * 100) / 100,
             totalAssets: Math.round(user.portfolio.initialCapital * 100) / 100,
             return: 0,
           })
         }
 
-        currentDate.setDate(currentDate.getDate() + 1)
+        currentDate = KSTDate.addDays(currentDate, 1)
       }
 
       return {
@@ -184,7 +175,8 @@ export async function getPortfolioHistory(
     // Helper function to get stock price for a specific date
     // Only uses historical prices from StockPriceHistory for accuracy
     const getStockPrice = (stockCode: string, date: Date): number | null => {
-      const dateKey = getDateKey(date)
+      const kstDate = KSTDate.fromDate(date)
+      const dateKey = KSTDate.format(kstDate)
       const stockPrices = priceHistoryMap.get(stockCode)
 
       if (!stockPrices) {
@@ -200,8 +192,8 @@ export async function getPortfolioHistory(
       // If exact date not found (weekend/holiday), look for most recent past price
       // Search up to 7 days back to handle long weekends
       for (let i = 1; i <= 7; i++) {
-        const prevDate = addKSTDays(date, -i)
-        const prevDateKey = getDateKey(prevDate)
+        const prevDate = KSTDate.addDays(kstDate, -i)
+        const prevDateKey = KSTDate.format(prevDate)
 
         if (stockPrices.has(prevDateKey)) {
           return stockPrices.get(prevDateKey)!
@@ -221,23 +213,23 @@ export async function getPortfolioHistory(
     const holdings = new Map<string, { quantity: number; avgPrice: number }>()
 
     // 6.1. Fill initial period from portfolio creation to first transaction
-    const portfolioCreationDate = toKSTDateOnly(user.portfolio.createdAt)
-    const firstTransactionDate = toKSTDateOnly(transactions[0].createdAt)
+    const portfolioCreationDate = KSTDate.fromDate(user.portfolio.createdAt)
+    const firstTransactionDate = KSTDate.fromDate(transactions[0].createdAt)
 
-    let currentDate = new Date(portfolioCreationDate)
+    let currentDate = portfolioCreationDate
     while (currentDate < firstTransactionDate) {
       const shouldInclude = !startDate || currentDate >= startDate
 
       if (shouldInclude) {
         history.push({
-          date: new Date(currentDate),
+          date: currentDate,
           cash: Math.round(user.portfolio.initialCapital * 100) / 100,
           totalAssets: Math.round(user.portfolio.initialCapital * 100) / 100,
           return: 0,
         })
       }
 
-      currentDate = addKSTDays(currentDate, 1)
+      currentDate = KSTDate.addDays(currentDate, 1)
     }
 
     for (const tx of transactions) {
@@ -309,15 +301,15 @@ export async function getPortfolioHistory(
     // 7. Fill in daily points from last transaction to end date (if any transactions exist)
     // Note: Only include today if market has closed (after 15:35 KST) and today's data exists in StockPriceHistory
     if (history.length > 0) {
-      const lastHistoryDate = toKSTDateOnly(history[history.length - 1].date)
+      const lastHistoryDate = KSTDate.fromDate(history[history.length - 1].date)
 
       // Determine end date in KST: include today only if we have confirmed closing prices
       // Market closes at 15:30 KST, data is saved at 15:35 KST
-      const today = getKSTToday()
-      const endDate = isAfterKSTTime(15, 35) ? today : getKSTYesterday()
+      const today = KSTDate.today()
+      const endDate = KSTDateTime.isAfterTime(15, 35) ? today : KSTDate.yesterday()
 
       // Add daily points from day after last transaction to end date
-      let currentDate = addKSTDays(lastHistoryDate, 1)
+      let currentDate = KSTDate.addDays(lastHistoryDate, 1)
 
       while (currentDate <= endDate) {
         // Calculate portfolio value with historical prices for each day
@@ -334,22 +326,22 @@ export async function getPortfolioHistory(
           ((totalAssets - user.portfolio.initialCapital) / user.portfolio.initialCapital) * 100
 
         history.push({
-          date: new Date(currentDate),
+          date: currentDate,
           cash: Math.round(cash * 100) / 100,
           totalAssets: Math.round(totalAssets * 100) / 100,
           return: Math.round(returnRate * 100) / 100,
         })
 
-        currentDate = addKSTDays(currentDate, 1)
+        currentDate = KSTDate.addDays(currentDate, 1)
       }
     }
 
     // 8. If specific date requested, filter to only that date
     let finalHistory = history
     if (specificDate) {
-      const targetDateKey = getDateKey(specificDate)
+      const targetDateKey = KSTDate.format(specificDate)
       finalHistory = history.filter((point) => {
-        const pointDateKey = getDateKey(point.date)
+        const pointDateKey = KSTDate.format(KSTDate.fromDate(point.date))
         return pointDateKey === targetDateKey
       })
     }

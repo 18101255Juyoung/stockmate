@@ -55,7 +55,7 @@ export default function FollowButton({
       const endpoint = isFollowing
         ? `/api/users/${username}/unfollow`
         : `/api/users/${username}/follow`
-      const method = isFollowing ? 'POST' : 'POST'
+      const method = isFollowing ? 'DELETE' : 'POST'
 
       const res = await fetch(endpoint, { method })
 

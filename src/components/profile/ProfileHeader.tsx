@@ -75,7 +75,6 @@ export default function ProfileHeader({ user }: ProfileHeaderProps) {
                   <FollowButton
                     username={user.username}
                     isOwnProfile={isOwnProfile}
-                    initialIsFollowing={false}
                   />
                 )}
               </div>
@@ -93,10 +92,6 @@ export default function ProfileHeader({ user }: ProfileHeaderProps) {
               <div>
                 <span className="font-bold">{user.postCount}</span>{' '}
                 <span className="text-gray-600">게시글</span>
-              </div>
-              <div>
-                <span className="font-bold">{user.transactionCount}</span>{' '}
-                <span className="text-gray-600">거래</span>
               </div>
               <Link
                 href={`/profile/${user.username}/followers`}

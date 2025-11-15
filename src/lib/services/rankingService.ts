@@ -37,75 +37,81 @@ export async function updateRankings(
   period: RankingPeriod
 ): Promise<ApiResponse<{ updated: number }>> {
   try {
-    // Get all portfolios
-    const portfolios = await prisma.portfolio.findMany({
-      include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-            displayName: true,
+    // Use transaction to ensure atomic delete+create
+    // If error occurs, both operations are rolled back
+    const result = await prisma.$transaction(async (tx) => {
+      // Get all portfolios
+      const portfolios = await tx.portfolio.findMany({
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              displayName: true,
+            },
           },
         },
-      },
-    })
-
-    // Delete existing rankings for this period
-    await prisma.ranking.deleteMany({
-      where: { period },
-    })
-
-    // If no portfolios, return early
-    if (portfolios.length === 0) {
-      return {
-        success: true,
-        data: { updated: 0 },
-      }
-    }
-
-    // Calculate period-specific returns for each portfolio
-    const portfoliosWithReturns = await Promise.all(
-      portfolios.map(async (portfolio) => {
-        let periodReturn: number
-
-        if (period === 'ALL_TIME') {
-          // Use cumulative totalReturn from Portfolio
-          periodReturn = portfolio.totalReturn
-        } else {
-          // Calculate period-specific return using snapshots
-          periodReturn = await calculatePeriodReturn(
-            portfolio.id,
-            period as PrismaRankingPeriod
-          )
-        }
-
-        return {
-          userId: portfolio.userId,
-          periodReturn,
-        }
       })
-    )
 
-    // Sort by period return descending
-    const sortedPortfolios = portfoliosWithReturns.sort(
-      (a, b) => b.periodReturn - a.periodReturn
-    )
+      // If no portfolios, return early
+      if (portfolios.length === 0) {
+        return { updated: 0 }
+      }
 
-    // Create rankings (limit to top 100)
-    const rankings = sortedPortfolios.slice(0, 100).map((portfolio, index) => ({
-      userId: portfolio.userId,
-      rank: index + 1,
-      totalReturn: portfolio.periodReturn,
-      period,
-    }))
+      // Calculate period-specific returns for each portfolio
+      const portfoliosWithReturns = await Promise.all(
+        portfolios.map(async (portfolio) => {
+          let periodReturn: number
 
-    await prisma.ranking.createMany({
-      data: rankings,
+          if (period === 'ALL_TIME') {
+            // Use cumulative totalReturn from Portfolio
+            periodReturn = portfolio.totalReturn
+          } else {
+            // Calculate period-specific return using snapshots
+            periodReturn = await calculatePeriodReturn(
+              portfolio.id,
+              period as PrismaRankingPeriod
+            )
+          }
+
+          return {
+            userId: portfolio.userId,
+            periodReturn,
+          }
+        })
+      )
+
+      // Sort by period return descending
+      const sortedPortfolios = portfoliosWithReturns.sort(
+        (a, b) => b.periodReturn - a.periodReturn
+      )
+
+      // Create rankings (limit to top 100)
+      const rankings = sortedPortfolios.slice(0, 100).map((portfolio, index) => ({
+        userId: portfolio.userId,
+        rank: index + 1,
+        totalReturn: portfolio.periodReturn,
+        period,
+      }))
+
+      // Delete existing rankings and create new ones atomically
+      await tx.ranking.deleteMany({
+        where: { period },
+      })
+
+      await tx.ranking.createMany({
+        data: rankings,
+      })
+
+      return { updated: rankings.length }
+    }, {
+      timeout: 30000, // 30 second timeout
+      maxWait: 5000,  // Wait max 5 seconds to acquire transaction
     })
 
     return {
       success: true,
-      data: { updated: rankings.length },
+      data: result,
     }
   } catch (error) {
     // Improved error logging with context

@@ -94,6 +94,24 @@ export function isAfterKSTTime(hour: number, minute: number): boolean {
 }
 
 /**
+ * Check if a given date is weekend in KST
+ * @param date - Date to check
+ * @returns true if the date is Saturday or Sunday in KST
+ */
+export function isKSTWeekend(date: Date): boolean {
+  // Get KST date string in YYYY-MM-DD format
+  const kstDateStr = date.toLocaleDateString('en-CA', {
+    timeZone: 'Asia/Seoul',
+  })
+
+  // Create a Date object from the date string at midnight UTC
+  const kstDate = new Date(kstDateStr + 'T00:00:00Z')
+  const day = kstDate.getUTCDay() // 0 = Sunday, 6 = Saturday
+
+  return day === 0 || day === 6
+}
+
+/**
  * Check if current KST time is market hours
  * Market hours: 09:00 - 15:30 KST, Monday to Friday
  *
@@ -102,14 +120,8 @@ export function isAfterKSTTime(hour: number, minute: number): boolean {
 export function isMarketOpen(): boolean {
   const now = new Date()
 
-  // Get day of week in KST
-  const kstDay = parseInt(now.toLocaleDateString('en-US', {
-    timeZone: 'Asia/Seoul',
-    weekday: 'numeric' // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-  }))
-
-  // Weekend check (0 = Sunday, 6 = Saturday)
-  if (kstDay === 0 || kstDay === 6) return false
+  // Weekend check (Saturday or Sunday)
+  if (isKSTWeekend(now)) return false
 
   const { hour, minute } = getKSTTime()
 

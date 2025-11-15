@@ -8,6 +8,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { PrismaClient } from '@prisma/client'
 import { generatePortfolioAnalysis } from '@/lib/services/portfolioAnalysisService'
+import { KSTDate } from '@/lib/utils/kst-date'
 
 const prisma = new PrismaClient()
 
@@ -30,8 +31,7 @@ export async function POST(request: NextRequest) {
     // 2. 날짜 파라미터
     const body = await request.json()
     const dateStr = body.date
-    const date = dateStr ? new Date(dateStr) : new Date()
-    date.setHours(0, 0, 0, 0)
+    const date = dateStr ? KSTDate.parse(dateStr) : KSTDate.today()
 
     // 3. 기존 분석 확인
     const existing = await prisma.portfolioAnalysis.findUnique({

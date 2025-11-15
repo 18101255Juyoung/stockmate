@@ -64,11 +64,6 @@ export default function JournalDateCard({
                   거래
                 </span>
               )}
-              {hasAIAnalysis && (
-                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
-                  AI 분석
-                </span>
-              )}
             </div>
           </div>
 

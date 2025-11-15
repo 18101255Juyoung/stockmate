@@ -7,11 +7,15 @@ import { GET as getStockPrice } from '@/app/api/stocks/[code]/route'
 import { GET as searchStocks } from '@/app/api/stocks/search/route'
 import { NextRequest } from 'next/server'
 import * as stockService from '@/lib/services/stockService'
+import { verifyTestDatabase } from '../../helpers/database'
 
 // Mock stock service
 jest.mock('@/lib/services/stockService')
 
 describe('Stock API Integration Tests', () => {
+  // ⚠️ SAFETY CHECK: Verify we're using test database
+  beforeAll(verifyTestDatabase)
+
   beforeEach(() => {
     jest.clearAllMocks()
   })

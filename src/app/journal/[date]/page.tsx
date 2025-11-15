@@ -380,8 +380,8 @@ export default function JournalDetailPage() {
         </div>
       )}
 
-      {/* 개인 포트폴리오 섹션 */}
-      {portfolioSnapshot && (
+      {/* 개인 포트폴리오 섹션 - 거래가 없는 날만 표시 */}
+      {portfolioSnapshot && transactions.length === 0 && (
         <div className="mb-6">
           <div className="border border-gray-200 rounded-lg p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4">내 포트폴리오</h2>

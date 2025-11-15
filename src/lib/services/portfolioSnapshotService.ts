@@ -6,7 +6,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { RankingPeriod, PortfolioSnapshot } from '@prisma/client'
-import { toKSTDateOnly, addKSTDays } from '@/lib/utils/timezone'
+import { KSTDate, type KSTDate as KSTDateType } from '@/lib/utils/kst-date'
 
 /**
  * Create or update a daily snapshot of a portfolio
@@ -22,10 +22,8 @@ export async function createDailySnapshot(
 ): Promise<PortfolioSnapshot> {
   try {
     // Default to today if no date provided
-    const snapshotDate = date || new Date()
-
     // Normalize date to midnight in KST (remove time component)
-    const normalizedDate = toKSTDateOnly(snapshotDate)
+    const snapshotDate = date ? KSTDate.fromDate(date) : KSTDate.today()
 
     // Get current portfolio data
     const portfolio = await prisma.portfolio.findUnique({
@@ -41,7 +39,7 @@ export async function createDailySnapshot(
       where: {
         portfolioId_date: {
           portfolioId,
-          date: normalizedDate,
+          date: snapshotDate,
         },
       },
       update: {
@@ -51,7 +49,7 @@ export async function createDailySnapshot(
       },
       create: {
         portfolioId,
-        date: normalizedDate,
+        date: snapshotDate,
         totalAssets: portfolio.totalAssets,
         totalReturn: portfolio.totalReturn,
         currentCash: portfolio.currentCash,
@@ -78,13 +76,13 @@ export async function getSnapshotByDate(
 ): Promise<PortfolioSnapshot | null> {
   try {
     // Normalize date to midnight in KST
-    const normalizedDate = toKSTDateOnly(date)
+    const snapshotDate = KSTDate.fromDate(date)
 
     const snapshot = await prisma.portfolioSnapshot.findUnique({
       where: {
         portfolioId_date: {
           portfolioId,
-          date: normalizedDate,
+          date: snapshotDate,
         },
       },
     })
@@ -113,21 +111,21 @@ export async function calculatePeriodReturn(
 ): Promise<number> {
   try {
     // Determine date range based on period
-    const now = new Date()
-    let startDate: Date | null = null
+    const now = KSTDate.today()
+    let startDate: KSTDateType | null = null
 
     switch (period) {
       case RankingPeriod.DAILY:
         // 1 day ago
-        startDate = addKSTDays(now, -1)
+        startDate = KSTDate.addDays(now, -1)
         break
       case RankingPeriod.WEEKLY:
         // 7 days ago
-        startDate = addKSTDays(now, -7)
+        startDate = KSTDate.addDays(now, -7)
         break
       case RankingPeriod.MONTHLY:
         // 30 days ago
-        startDate = addKSTDays(now, -30)
+        startDate = KSTDate.addDays(now, -30)
         break
       case RankingPeriod.ALL_TIME:
         // No start date filter for ALL_TIME
@@ -161,12 +159,32 @@ export async function calculatePeriodReturn(
       orderBy: { date: 'asc' },
     })
 
-    // Need at least 2 snapshots to calculate return
-    if (snapshots.length < 2) {
+    // Handle cases with insufficient snapshots
+    if (snapshots.length === 0) {
+      // No snapshots at all - return 0%
       return 0
     }
 
-    // Get oldest and newest snapshots in the period
+    if (snapshots.length === 1) {
+      // Single snapshot (new user case) - compare with initial capital
+      const portfolio = await prisma.portfolio.findUnique({
+        where: { id: portfolioId },
+        select: { initialCapital: true },
+      })
+
+      if (!portfolio || portfolio.initialCapital === 0) {
+        return 0
+      }
+
+      const currentSnapshot = snapshots[0]
+      const currentAssets = currentSnapshot.totalAssets
+
+      // Calculate return based on initial capital
+      // Example: initialCapital = 10,000,000, currentAssets = 10,500,000 → 5%
+      return ((currentAssets - portfolio.initialCapital) / portfolio.initialCapital) * 100
+    }
+
+    // Get oldest and newest snapshots in the period (2+ snapshots)
     const oldestSnapshot = snapshots[0]
     const newestSnapshot = snapshots[snapshots.length - 1]
 

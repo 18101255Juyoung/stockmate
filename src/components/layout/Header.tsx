@@ -16,25 +16,25 @@ export default function Header() {
 
           <nav className="hidden md:flex items-center gap-6">
             <Link href="/trading" className="hover:text-blue-600">
-              Trading
+              모의투자
             </Link>
             <Link href="/portfolio" className="hover:text-blue-600">
-              Portfolio
+              포트폴리오
             </Link>
             <Link href="/journal" className="hover:text-blue-600">
-              Journal
+              투자일지
             </Link>
             <Link href="/community" className="hover:text-blue-600">
-              Community
+              커뮤니티
             </Link>
             <Link href="/ranking" className="hover:text-blue-600">
-              Ranking
+              랭킹
             </Link>
           </nav>
 
           <div className="flex items-center gap-4">
             {status === 'loading' ? (
-              <div className="px-4 py-2 text-sm text-gray-400">Loading...</div>
+              <div className="px-4 py-2 text-sm text-gray-400">로딩중...</div>
             ) : session ? (
               <>
                 <Link
@@ -47,7 +47,7 @@ export default function Header() {
                   onClick={() => signOut({ callbackUrl: '/' })}
                   className="px-4 py-2 text-sm text-red-600 hover:text-red-700"
                 >
-                  Logout
+                  로그아웃
                 </button>
               </>
             ) : (
@@ -56,13 +56,13 @@ export default function Header() {
                   href="/login"
                   className="px-4 py-2 text-sm hover:text-blue-600"
                 >
-                  Login
+                  로그인
                 </Link>
                 <Link
                   href="/register"
                   className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
                 >
-                  Sign Up
+                  회원가입
                 </Link>
               </>
             )}

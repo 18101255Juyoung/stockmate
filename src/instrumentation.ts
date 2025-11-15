@@ -68,8 +68,55 @@ export async function register() {
               await triggerPriceUpdate()
             } else {
               // After market close (15:31-23:59)
-              console.log('  🔒 Market closed - Creating final daily candle...')
+              console.log('  🔒 Market closed - Running end-of-day tasks...')
+
+              // Task 1: Daily candles (15:35)
+              console.log('  📊 Creating final daily candle...')
               await triggerDailyCandleCreation()
+
+              // Task 2: Market Analysis (15:35 이후면 생성)
+              if (timeInMinutes >= 15 * 60 + 35) {
+                const { KSTDate } = await import('@/lib/utils/kst-date')
+                const { prisma } = await import('@/lib/prisma')
+
+                const today = KSTDate.today()
+                const existingAnalysis = await prisma.marketAnalysis.findUnique({
+                  where: { date: today }
+                })
+
+                if (!existingAnalysis) {
+                  console.log('  📰 Generating market analysis...')
+                  const { generateMarketAnalysis } = await import('@/lib/services/aiAdvisorService')
+                  await generateMarketAnalysis(today)
+                  console.log('  ✅ Market analysis completed')
+                } else {
+                  console.log('  ℹ️  Market analysis already exists')
+                }
+              }
+
+              // Task 3: Portfolio Snapshots (15:40 이후면 생성) - CRITICAL
+              if (timeInMinutes >= 15 * 60 + 40) {
+                console.log('  📸 Creating portfolio snapshots...')
+                const { createAllDailySnapshots } = await import('@/lib/services/portfolioSnapshotService')
+                await createAllDailySnapshots(kstTime)
+                console.log('  ✅ Snapshots created')
+              }
+
+              // Task 4: Portfolio Analysis (16:00 이후면 생성)
+              if (timeInMinutes >= 16 * 60) {
+                console.log('  📊 Generating portfolio analysis...')
+                const { generateDailyPortfolioAnalysisForAllUsers } = await import('@/lib/services/portfolioAnalysisService')
+                await generateDailyPortfolioAnalysisForAllUsers(kstTime)
+                console.log('  ✅ Portfolio analysis completed')
+              }
+
+              // Task 5: Rankings Update (16:10 이후면 업데이트)
+              if (timeInMinutes >= 16 * 60 + 10) {
+                console.log('  🏆 Updating rankings...')
+                const { triggerRankingUpdate } = await import('@/lib/scheduler')
+                await triggerRankingUpdate()
+                console.log('  ✅ Rankings updated')
+              }
             }
 
             console.log('✅ [Instrumentation] Server initialization completed\n')

@@ -57,12 +57,21 @@ npm start                     # Start production server
 
 ### Testing
 ```bash
-npm test                      # Run all tests
+npm test                      # Run all tests (uses stockmate_test database)
 npm run test:watch            # Run tests in watch mode
 npm run test:coverage         # Generate coverage report (target: 80%+)
 jest path/to/test.spec.ts     # Run single test file
 jest -t "test name"           # Run specific test by name
 ```
+
+**⚠️ CRITICAL: Test Database Safety**
+- Tests **MUST** use the separate `stockmate_test` database
+- **NEVER** run tests directly with `jest` - always use `npm test`
+- Integration tests have safety checks that verify the database
+- If tests fail with "FATAL: Tests MUST use stockmate_test database", check:
+  1. You're using `npm test` (not `jest` directly)
+  2. `jest.setup.js` is loading correctly
+  3. `.env.test` contains `DATABASE_URL` with `stockmate_test`
 
 ### Database
 ```bash
@@ -580,12 +589,21 @@ npm run db:restore             # Restore from backup (interactive)
    - Keeps last 7 days
    - Stored in `backups/` directory
 
-2. **Separate Test Database**
+2. **Separate Test Database (CRITICAL)**
    - Dev DB: `stockmate`
    - Test DB: `stockmate_test`
-   - Tests never affect dev data
+   - Tests automatically use test DB via `jest.setup.js`
+   - Safety checks in all integration tests verify correct database
+   - **NEVER** run `jest` directly - always use `npm test`
+   - Protects against accidental data deletion (incident: Nov 14, 2025)
 
-3. **Safe Seed Mode**
+3. **Test Database Safety Checks**
+   - `jest.setup.js` forces `DATABASE_URL` to test database
+   - All integration tests verify database before running
+   - Tests fail immediately if production DB is detected
+   - Helper function: `verifyTestDatabase()` in all integration tests
+
+4. **Safe Seed Mode**
    - Default: `SEED_MODE=safe` (preserves existing data)
    - Only use `reset` mode when explicitly needed
 
@@ -638,12 +656,19 @@ npm run dev
 
 ## Common Pitfalls
 
-### 1. TDD Violations
+### 1. Test Database Safety (MOST CRITICAL)
+- **NEVER** run integration tests on production database
+- **ALWAYS** use `npm test` instead of `jest` directly
+- Integration tests with `beforeEach` that delete data can wipe production
+- Incident (Nov 14, 2025): Tests ran on `stockmate` DB, deleted all user data
+- Prevention: Now enforced via `jest.setup.js` and `verifyTestDatabase()`
+
+### 2. TDD Violations
 - Writing implementation before tests
 - Skipping test failure verification
 - Modifying tests to make them pass
 
-### 2. Trading Logic Bugs
+### 3. Trading Logic Bugs
 - Not checking cash balance before buy
 - Not validating stock quantity before sell
 - Incorrect average price calculation (use FIFO)

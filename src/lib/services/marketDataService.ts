@@ -11,6 +11,7 @@ import {
   fetchNaverSectors,
   fetchMarketNews,
 } from './naverFinanceService'
+import { KSTDate, KSTDateTime } from '@/lib/utils/kst-date'
 
 /**
  * 시장 데이터 인터페이스
@@ -84,7 +85,7 @@ export async function collectMarketData(): Promise<MarketData> {
     const totalCount = sectorsData.length
 
     return {
-      collectedAt: new Date(),
+      collectedAt: KSTDateTime.now(),
       indices: {
         kospi: {
           name: 'KOSPI',
@@ -128,7 +129,7 @@ export function formatMarketDataForAI(data: MarketData): string {
     .slice(0, 5)
 
   return `
-## 📈 오늘의 시장 현황 (${data.collectedAt.toLocaleDateString('ko-KR')})
+## 📈 오늘의 시장 현황 (${KSTDate.format(KSTDate.fromDate(data.collectedAt))})
 
 ### 주요 지수
 - **KOSPI**: ${indices.kospi.value.toFixed(2)} (${indices.kospi.changeRate > 0 ? '+' : ''}${indices.kospi.changeRate.toFixed(2)}%, ${indices.kospi.change > 0 ? '+' : ''}${indices.kospi.change.toFixed(2)}p)

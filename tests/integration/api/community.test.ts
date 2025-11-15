@@ -16,8 +16,11 @@ import {
   getComments,
   deleteComment,
 } from '@/lib/services/commentService'
+import { verifyTestDatabase } from '../../helpers/database'
 
 describe('Community API Integration Tests - Posts', () => {
+  // ⚠️ SAFETY CHECK: Verify we're using test database
+  beforeAll(verifyTestDatabase)
   let testUser1Id: string
   let testUser2Id: string
 

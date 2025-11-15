@@ -5,9 +5,13 @@
 
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcrypt'
+import { verifyTestDatabase } from '../../helpers/database'
 
 describe('POST /api/auth/register', () => {
-  // Clean up database before each test
+  // ⚠️ SAFETY CHECK: Verify we're using test database
+  beforeAll(verifyTestDatabase)
+
+  // Clean up test database before each test (safe - verified above)
   beforeEach(async () => {
     await prisma.user.deleteMany({})
     await prisma.portfolio.deleteMany({})

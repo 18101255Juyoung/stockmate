@@ -3,6 +3,10 @@ import { GET } from '@/app/api/portfolio/history/route'
 import * as portfolioHistoryService from '@/lib/services/portfolioHistoryService'
 import { getServerSession } from 'next-auth'
 import { ErrorCodes } from '@/lib/types/api'
+import { verifyTestDatabase } from '../../helpers/database'
+
+// ⚠️ SAFETY CHECK: Verify we're using test database
+beforeAll(verifyTestDatabase)
 
 // Mock NextAuth
 jest.mock('next-auth')

@@ -8,7 +8,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { backfillAllStocks, fetchHistoricalData } from './historicalDataCollector'
-import { getKSTToday, toKSTDateOnly, addKSTDays } from '@/lib/utils/timezone'
+import { KSTDate, KSTDateTime, type KSTDate as KSTDateType } from '@/lib/utils/kst-date'
 
 /**
  * Get the most recent date in StockPriceHistory
@@ -34,31 +34,24 @@ export async function getHistoryDataCount(): Promise<number> {
  * Check if a date is a weekend (Saturday or Sunday)
  * Uses KST timezone
  */
-function isWeekend(date: Date): boolean {
-  // Get day of week in KST
-  const kstDay = parseInt(
-    date.toLocaleDateString('en-US', {
-      timeZone: 'Asia/Seoul',
-      weekday: 'numeric',
-    })
-  )
-  return kstDay === 0 || kstDay === 6 // 0 = Sunday, 6 = Saturday
+function isWeekend(date: KSTDateType): boolean {
+  return KSTDate.isWeekend(date)
 }
 
 /**
  * Get array of weekdays between two dates (inclusive)
  * Excludes weekends
  */
-export function getMissingWeekdays(startDate: Date, endDate: Date): Date[] {
-  const weekdays: Date[] = []
-  let current = toKSTDateOnly(startDate)
-  const end = toKSTDateOnly(endDate)
+export function getMissingWeekdays(startDate: Date, endDate: Date): KSTDateType[] {
+  const weekdays: KSTDateType[] = []
+  let current = KSTDate.fromDate(startDate)
+  const end = KSTDate.fromDate(endDate)
 
   while (current <= end) {
     if (!isWeekend(current)) {
-      weekdays.push(new Date(current))
+      weekdays.push(current)
     }
-    current = addKSTDays(current, 1)
+    current = KSTDate.addDays(current, 1)
   }
 
   return weekdays
@@ -70,22 +63,21 @@ export function getMissingWeekdays(startDate: Date, endDate: Date): Date[] {
  * @returns Number of stocks updated
  */
 export async function backfillSpecificDate(date: Date): Promise<number> {
+  // Normalize to KST date
+  const normalizedDate = KSTDate.fromDate(date)
+
   // SAFETY CHECK: Skip weekends in KST
-  if (isWeekend(date)) {
+  if (isWeekend(normalizedDate)) {
     // Get day name in KST
     const dayName = date.toLocaleDateString('en-US', {
       timeZone: 'Asia/Seoul',
       weekday: 'long',
     })
-    console.log(`  ⏭️  Skipping ${date.toISOString().split('T')[0]} (${dayName} - Weekend)`)
+    console.log(`  ⏭️  Skipping ${KSTDate.format(normalizedDate)} (${dayName} - Weekend)`)
     return 0
   }
 
-  console.log(`  📥 Backfilling data for ${date.toISOString().split('T')[0]}...`)
-
-  // Keep date in UTC to avoid timezone conversion issues
-  const normalizedDate = new Date(date)
-  normalizedDate.setUTCHours(0, 0, 0, 0)
+  console.log(`  📥 Backfilling data for ${KSTDate.format(normalizedDate)}...`)
 
   // Get all stocks
   const stocks = await prisma.stock.findMany({
@@ -101,11 +93,9 @@ export async function backfillSpecificDate(date: Date): Promise<number> {
       const histData = await fetchHistoricalData(stock.stockCode, 5)
 
       // Find data for the target date
-      // Use UTC date components to match the date passed in
-      const year = normalizedDate.getUTCFullYear()
-      const month = String(normalizedDate.getUTCMonth() + 1).padStart(2, '0')
-      const day = String(normalizedDate.getUTCDate()).padStart(2, '0')
-      const targetDateStr = `${year}${month}${day}` // YYYYMMDD
+      // Use KST date components to match the date passed in
+      const dateStr = KSTDate.format(normalizedDate) // YYYY-MM-DD
+      const targetDateStr = dateStr.replace(/-/g, '') // YYYYMMDD
 
       const dayData = histData.find((item) => item.stck_bsop_date === targetDateStr)
 
@@ -169,7 +159,7 @@ export async function autoFixChartData(): Promise<void> {
 
   try {
     const lastDate = await getLastDataDate()
-    const today = getKSTToday()
+    const today = KSTDate.today()
 
     if (!lastDate) {
       console.log('  ⚠️  No data found. Running full backfill (90 days)...')
@@ -179,13 +169,13 @@ export async function autoFixChartData(): Promise<void> {
     }
 
     // Check for missing dates
-    const lastDataDate = toKSTDateOnly(lastDate)
+    const lastDataDate = KSTDate.fromDate(lastDate)
 
-    console.log(`  Last data date: ${lastDataDate.toISOString().split('T')[0]}`)
-    console.log(`  Today: ${today.toISOString().split('T')[0]}`)
+    console.log(`  Last data date: ${KSTDate.format(lastDataDate)}`)
+    console.log(`  Today: ${KSTDate.format(today)}`)
 
     // Get missing weekdays
-    const nextDay = addKSTDays(lastDataDate, 1)
+    const nextDay = KSTDate.addDays(lastDataDate, 1)
 
     const missingDates = getMissingWeekdays(nextDay, today)
 

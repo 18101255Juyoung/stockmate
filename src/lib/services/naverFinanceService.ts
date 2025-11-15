@@ -5,6 +5,7 @@
 
 import axios from 'axios'
 import * as cheerio from 'cheerio'
+import { KSTDateTime } from '@/lib/utils/kst-date'
 
 interface IndexData {
   value: number
@@ -195,7 +196,7 @@ export async function fetchMarketNews(limit: number = 5): Promise<NewsItem[]> {
         news.push({
           title,
           link: fullLink,
-          pubDate: new Date().toISOString(), // RSS가 아니므로 현재 시간 사용
+          pubDate: KSTDateTime.now().toISOString(), // RSS가 아니므로 KST 현재 시간 사용
         })
       }
     })

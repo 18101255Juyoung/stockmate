@@ -8,6 +8,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ErrorCodes } from '@/lib/types/api'
+import { KSTDate } from '@/lib/utils/kst-date'
+import { DateQuery } from '@/lib/db/queries'
 
 export async function GET(request: NextRequest) {
   try {
@@ -50,14 +52,8 @@ export async function GET(request: NextRequest) {
 
     // Filter by date if provided
     if (date) {
-      const startDate = new Date(date)
-      const endDate = new Date(date)
-      endDate.setDate(endDate.getDate() + 1)
-
-      where.createdAt = {
-        gte: startDate,
-        lt: endDate,
-      }
+      const kstDate = KSTDate.parse(date)
+      where.createdAt = DateQuery.onDate(kstDate)
     }
 
     // Get transactions

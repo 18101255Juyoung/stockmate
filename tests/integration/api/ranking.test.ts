@@ -10,12 +10,16 @@ import {
   getUserRank,
   RankingPeriod,
 } from '@/lib/services/rankingService'
+import { verifyTestDatabase } from '../../helpers/database'
 
 describe('Ranking API Integration Tests', () => {
   let testUser1Id: string
   let testUser2Id: string
   let testUser3Id: string
   let testUser4Id: string
+
+  // ⚠️ SAFETY CHECK: Verify we're using test database
+  beforeAll(verifyTestDatabase)
 
   beforeEach(async () => {
     // Clean up database

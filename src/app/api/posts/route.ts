@@ -23,6 +23,9 @@ export async function GET(request: NextRequest) {
     const isVerified = searchParams.get('isVerified')
       ? searchParams.get('isVerified') === 'true'
       : undefined
+    const hasStock = searchParams.get('hasStock')
+      ? searchParams.get('hasStock') === 'true'
+      : undefined
 
     // Get posts
     const result = await getPosts({
@@ -30,6 +33,7 @@ export async function GET(request: NextRequest) {
       limit,
       userId,
       isVerified,
+      hasStock,
     })
 
     if (!result.success) {

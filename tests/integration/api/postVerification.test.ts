@@ -5,13 +5,17 @@
 
 import { prisma } from '@/lib/prisma'
 import { createPost, CreatePostData } from '@/lib/services/postService'
+import { verifyTestDatabase } from '../../helpers/database'
 
 describe('Post Return Rate Validation Integration Tests', () => {
   let testUserId: string
   let testPortfolioId: string
 
+  // ⚠️ SAFETY CHECK: Verify we're using test database
+  beforeAll(verifyTestDatabase)
+
   beforeEach(async () => {
-    // Clean up database
+    // Clean up test database (safe - verified above)
     await prisma.ranking.deleteMany({})
     await prisma.follow.deleteMany({})
     await prisma.like.deleteMany({})

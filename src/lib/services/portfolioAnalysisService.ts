@@ -12,7 +12,8 @@ import {
   formatMarketDataForAI,
   type MarketData,
 } from './marketDataService'
-import { startOfDay, endOfDay } from 'date-fns'
+import { KSTDate, type KSTDate as KSTDateType } from '@/lib/utils/kst-date'
+import { DateQuery } from '@/lib/db/queries'
 
 const prisma = new PrismaClient()
 const openai = new OpenAI({
@@ -61,14 +62,13 @@ interface TransactionSummary {
  */
 export async function generatePortfolioAnalysis(
   userId: string,
-  date: Date = new Date()
+  date?: KSTDateType
 ): Promise<any> {
   console.log(`\n📊 Generating portfolio analysis for user ${userId}...`)
 
   try {
     // 1. 오늘의 스냅샷 조회 (15:40에 생성된 것)
-    const dateOnly = new Date(date)
-    dateOnly.setHours(0, 0, 0, 0)
+    const dateOnly = date || KSTDate.today()
 
     const snapshot = await prisma.portfolioSnapshot.findFirst({
       where: {
@@ -113,10 +113,7 @@ export async function generatePortfolioAnalysis(
     const todayTransactions = await prisma.transaction.findMany({
       where: {
         userId,
-        createdAt: {
-          gte: startOfDay(date),
-          lt: endOfDay(date),
-        },
+        createdAt: DateQuery.onDate(dateOnly),
       },
       orderBy: {
         createdAt: 'asc',
@@ -127,8 +124,7 @@ export async function generatePortfolioAnalysis(
     const marketData = await collectMarketData()
 
     // 5. 이전 날 스냅샷 (전일 대비 계산용)
-    const previousDate = new Date(dateOnly)
-    previousDate.setDate(previousDate.getDate() - 1)
+    const previousDate = KSTDate.addDays(dateOnly, -1)
 
     const previousSnapshot = await prisma.portfolioSnapshot.findFirst({
       where: {
@@ -254,7 +250,7 @@ function calculatePortfolioMetrics(
 
   // 섹터별 비중 (간단한 매핑 - 실제로는 Stock 테이블에서 가져와야 함)
   const sectorWeights: Record<string, number> = {}
-  holdings.forEach((h) => {
+  holdings.forEach((h: any) => {
     // 임시: 종목코드로 섹터 추정 (실제로는 DB에서 가져와야 함)
     const sector = estimateSector(h.stockCode)
     sectorWeights[sector] = (sectorWeights[sector] || 0) + h.weight
@@ -467,13 +463,16 @@ async function generateAnalysisSummary(fullAnalysis: string): Promise<string> {
  * 전체 사용자에 대해 포트폴리오 분석 생성 (16:00 스케줄러에서 호출)
  */
 export async function generateDailyPortfolioAnalysisForAllUsers(
-  date: Date = new Date()
+  date?: KSTDateType
 ): Promise<{ successful: number; failed: number; total: number }> {
   console.log(
     `\n📊 [Scheduled] Generating daily portfolio analysis for all users...`
   )
 
   try {
+    // KST 날짜 정규화
+    const targetDate = date || KSTDate.today()
+
     // 포트폴리오를 보유한 모든 사용자 조회
     const users = await prisma.user.findMany({
       where: {
@@ -495,7 +494,7 @@ export async function generateDailyPortfolioAnalysisForAllUsers(
     // 각 사용자에 대해 분석 생성
     for (const user of users) {
       try {
-        await generatePortfolioAnalysis(user.id, date)
+        await generatePortfolioAnalysis(user.id, targetDate)
         successful++
       } catch (error) {
         console.error(

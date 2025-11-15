@@ -7,6 +7,7 @@
 import { prisma } from '@/lib/prisma'
 import { getKISApiClient } from '@/lib/utils/kisApi'
 import { KIS_ENDPOINTS } from '@/lib/types/stock'
+import { KSTDate } from '@/lib/utils/kst-date'
 
 interface KISChartDataItem {
   stck_bsop_date: string // 영업일자 (YYYYMMDD)
@@ -40,24 +41,20 @@ export async function fetchHistoricalData(
     const client = getKISApiClient()
     const trId = client.getTrId('DAILY_CHART')
 
-    // Calculate end date (today) and start date
-    const endDate = new Date()
-    const startDate = new Date()
-    startDate.setDate(startDate.getDate() - days)
+    // Calculate end date (today) and start date in KST
+    const endDate = KSTDate.today()
+    const startDate = KSTDate.addDays(endDate, -days)
 
     // Format dates as YYYYMMDD
-    const formatDate = (date: Date) => {
-      const year = date.getFullYear()
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const day = String(date.getDate()).padStart(2, '0')
-      return `${year}${month}${day}`
+    const formatDateStr = (date: Date) => {
+      return KSTDate.format(KSTDate.fromDate(date)).replace(/-/g, '') // YYYYMMDD
     }
 
     const params = {
       FID_COND_MRKT_DIV_CODE: 'J', // Market division
       FID_INPUT_ISCD: stockCode,
-      FID_INPUT_DATE_1: formatDate(startDate),
-      FID_INPUT_DATE_2: formatDate(endDate),
+      FID_INPUT_DATE_1: formatDateStr(startDate),
+      FID_INPUT_DATE_2: formatDateStr(endDate),
       FID_PERIOD_DIV_CODE: 'D', // D: Daily, W: Weekly, M: Monthly
       FID_ORG_ADJ_PRC: '0', // 0: 수정주가 반영하지 않음, 1: 수정주가 반영
     }

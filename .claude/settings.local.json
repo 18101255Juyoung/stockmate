@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "Bash(powershell -Command:*)",
+      "Bash(PGPASSWORD=wnthdud12 psql:*)",
+      "Bash(npm run test:coverage:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

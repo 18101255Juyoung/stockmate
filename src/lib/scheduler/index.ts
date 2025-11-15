@@ -17,9 +17,16 @@ import { createAllDailySnapshots } from '@/lib/services/portfolioSnapshotService
 import { updateRankings } from '@/lib/services/rankingService'
 import { generateDailyPortfolioAnalysisForAllUsers } from '@/lib/services/portfolioAnalysisService'
 import { generateMarketAnalysis } from '@/lib/services/aiAdvisorService'
+import { KSTDate } from '@/lib/utils/kst-date'
 
 let isSchedulerRunning = false
 const jobs: schedule.Job[] = []
+
+/**
+ * Sleep utility for retry delays
+ * @param ms - Milliseconds to sleep
+ */
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 /**
  * Start the scheduler
@@ -87,7 +94,8 @@ export function startScheduler() {
     async () => {
       console.log('\n📰 [Scheduled] Generating market analysis...')
       try {
-        const analysis = await generateMarketAnalysis(new Date())
+        const kstToday = KSTDate.today()
+        const analysis = await generateMarketAnalysis(kstToday)
         console.log('✅ [Scheduled] Market analysis generated successfully')
       } catch (error) {
         console.error('❌ [Scheduled] Market analysis generation failed:', error)
@@ -100,14 +108,40 @@ export function startScheduler() {
 
   // Job 3: Create portfolio snapshots at 15:40 (after market close, after candles)
   // Cron pattern: 40 15 * * 1-5 (15:40, Mon-Fri)
+  // With retry logic (up to 3 attempts) to handle transient failures
   const snapshotJob = schedule.scheduleJob('40 15 * * 1-5', { tz: 'Asia/Seoul' }, async () => {
     console.log('\n📸 [Scheduled] Creating portfolio snapshots...')
-    try {
-      const snapshots = await createAllDailySnapshots()
-      console.log(`✅ [Scheduled] Portfolio snapshots created: ${snapshots.length}`)
-    } catch (error) {
-      console.error('❌ [Scheduled] Portfolio snapshot creation failed:', error)
+
+    const MAX_RETRIES = 3
+    const RETRY_DELAY = 5000 // 5 seconds
+    let attempt = 0
+    let lastError: Error | null = null
+
+    while (attempt < MAX_RETRIES) {
+      try {
+        const kstToday = KSTDate.today()
+        const snapshots = await createAllDailySnapshots(kstToday)
+
+        console.log(`✅ [Scheduled] Portfolio snapshots created: ${snapshots.length}`)
+        return // Success - exit retry loop
+
+      } catch (error) {
+        lastError = error as Error
+        attempt++
+
+        if (attempt < MAX_RETRIES) {
+          console.warn(`⚠️  [Scheduled] Snapshot creation failed (attempt ${attempt}/${MAX_RETRIES}), retrying in 5s...`)
+          console.warn(`   Error: ${lastError.message}`)
+          await sleep(RETRY_DELAY)
+        }
+      }
     }
+
+    // All retries failed - log critical error
+    console.error(`❌ [CRITICAL] Portfolio snapshot creation failed after ${MAX_RETRIES} attempts`)
+    console.error(`   Last error: ${lastError?.message}`)
+    console.error(`   This will affect ranking calculations at 16:10`)
+    // TODO: Send alert notification (Slack, Email, etc.)
   })
 
   jobs.push(snapshotJob)
@@ -124,7 +158,8 @@ export function startScheduler() {
     async () => {
     console.log('\n📊 [Scheduled] Starting unified portfolio analysis...')
     try {
-      const result = await generateDailyPortfolioAnalysisForAllUsers()
+      const kstToday = KSTDate.today()
+      const result = await generateDailyPortfolioAnalysisForAllUsers(kstToday)
       console.log(`✅ [Scheduled] Analysis completed: ${result.successful}/${result.total} users`)
     } catch (error) {
       console.error('❌ [Scheduled] Portfolio analysis failed:', error)
@@ -271,7 +306,8 @@ export async function triggerDailyCandleCreation() {
 export async function triggerSnapshotCreation() {
   console.log('🔧 [Manual] Triggering portfolio snapshot creation...')
   try {
-    const snapshots = await createAllDailySnapshots()
+    const kstToday = KSTDate.today()
+    const snapshots = await createAllDailySnapshots(kstToday)
     console.log(`✅ [Manual] Portfolio snapshots created: ${snapshots.length}`)
     return snapshots
   } catch (error) {

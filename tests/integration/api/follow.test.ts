@@ -12,14 +12,18 @@ import {
   isFollowing,
   getFollowCounts,
 } from '@/lib/services/followService'
+import { verifyTestDatabase } from '../../helpers/database'
 
 describe('Follow API Integration Tests', () => {
   let testUser1Id: string
   let testUser2Id: string
   let testUser3Id: string
 
+  // ⚠️ SAFETY CHECK: Verify we're using test database
+  beforeAll(verifyTestDatabase)
+
   beforeEach(async () => {
-    // Clean up database
+    // Clean up test database (safe - verified above)
     await prisma.follow.deleteMany({})
     await prisma.ranking.deleteMany({})
     await prisma.like.deleteMany({})

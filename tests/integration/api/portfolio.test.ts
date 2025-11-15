@@ -8,6 +8,10 @@ import { GET } from '@/app/api/portfolio/route'
 import * as portfolioService from '@/lib/services/portfolioService'
 import { getServerSession } from 'next-auth'
 import { ErrorCodes } from '@/lib/types/api'
+import { verifyTestDatabase } from '../../helpers/database'
+
+// ⚠️ SAFETY CHECK: Verify we're using test database
+beforeAll(verifyTestDatabase)
 
 // Mock NextAuth
 jest.mock('next-auth')

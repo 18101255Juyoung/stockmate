@@ -8,13 +8,17 @@ import {
   getPublicProfile,
   updateProfile,
 } from '@/lib/services/userProfileService'
+import { verifyTestDatabase } from '../../helpers/database'
 
 describe('Profile API Integration Tests', () => {
   let testUser1Id: string
   let testUser2Id: string
 
+  // ⚠️ SAFETY CHECK: Verify we're using test database
+  beforeAll(verifyTestDatabase)
+
   beforeEach(async () => {
-    // Clean up database
+    // Clean up test database (safe - verified above)
     await prisma.ranking.deleteMany({})
     await prisma.follow.deleteMany({})
     await prisma.like.deleteMany({})

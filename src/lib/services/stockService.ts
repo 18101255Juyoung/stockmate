@@ -14,6 +14,8 @@ import {
   KIS_ENDPOINTS,
   KIS_TR_IDS,
 } from '@/lib/types/stock'
+import { KSTDate, KSTDateTime } from '@/lib/utils/kst-date'
+import { isMarketOpen } from '@/lib/utils/timezone'
 
 // Cache TTL: 5 minutes
 const CACHE_TTL_SECONDS = 5 * 60
@@ -43,16 +45,60 @@ export async function getStockPrice(code: string): Promise<StockPrice> {
 
     // If stock exists in DB and has valid price data, use it
     if (stock && stock.currentPrice > 0 && stock.priceUpdatedAt) {
+      // Try to get the most recent OHLC from StockPriceHistory (accurate data)
+      // Use today's data if available, otherwise use the most recent available data
+      const latestCandle = await prisma.stockPriceHistory.findFirst({
+        where: {
+          stockCode: code,
+        },
+        orderBy: {
+          date: 'desc',
+        },
+      })
+
+      // Get previous day's candle for calculating change (exclude today)
+      const today = KSTDate.today()
+      const previousCandle = await prisma.stockPriceHistory.findFirst({
+        where: {
+          stockCode: code,
+          date: { lt: today }, // Get data before today
+        },
+        orderBy: {
+          date: 'desc',
+        },
+      })
+
+      // Use StockPriceHistory OHLC if available (accurate), otherwise fallback to Stock table
+      const openPrice = latestCandle?.openPrice ?? stock.openPrice
+      const highPrice = latestCandle?.highPrice ?? stock.highPrice
+      const lowPrice = latestCandle?.lowPrice ?? stock.lowPrice
+      const volume = latestCandle ? Number(latestCandle.volume) : Number(stock.volume)
+
+      // Current price logic:
+      // - During market hours (09:00-15:30): Use Stock.currentPrice (real-time updates)
+      // - After market close: Use StockPriceHistory.closePrice (accurate closing price)
+      // - If no closePrice available: Fallback to Stock.currentPrice
+      const marketOpen = isMarketOpen()
+      const currentPrice = !marketOpen && latestCandle?.closePrice
+        ? latestCandle.closePrice
+        : stock.currentPrice
+
+      // Calculate change and change rate based on previous day's close
+      // Use previous candle's closePrice, fallback to openPrice
+      const previousClose = previousCandle?.closePrice ?? openPrice
+      const changePrice = currentPrice - previousClose
+      const changeRate = previousClose > 0 ? ((changePrice / previousClose) * 100) : 0
+
       const stockPrice: StockPrice = {
         stockCode: stock.stockCode,
         stockName: stock.stockName,
-        currentPrice: stock.currentPrice,
-        changePrice: 0,
-        changeRate: 0,
-        openPrice: stock.openPrice,
-        highPrice: stock.highPrice,
-        lowPrice: stock.lowPrice,
-        volume: Number(stock.volume),
+        currentPrice: currentPrice,
+        changePrice: changePrice,
+        changeRate: changeRate,
+        openPrice: openPrice,
+        highPrice: highPrice,
+        lowPrice: lowPrice,
+        volume: volume,
         updatedAt: stock.priceUpdatedAt || stock.updatedAt,
       }
 
@@ -84,7 +130,7 @@ export async function getStockPrice(code: string): Promise<StockPrice> {
       highPrice: parseFloat(priceData.stck_hgpr) || 0,
       lowPrice: parseFloat(priceData.stck_lwpr) || 0,
       volume: parseInt(priceData.acml_vol) || 0,
-      updatedAt: new Date(),
+      updatedAt: KSTDateTime.now(),
     }
 
     // Cache the result

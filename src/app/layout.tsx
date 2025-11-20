@@ -9,6 +9,9 @@ export const metadata: Metadata = {
   description: 'A social platform for practicing stock investment safely through mock trading',
 }
 
+// Force dynamic rendering to prevent build-time static generation errors
+export const dynamic = 'force-dynamic'
+
 export default function RootLayout({
   children,
 }: Readonly<{

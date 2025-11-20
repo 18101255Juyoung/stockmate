@@ -8,6 +8,7 @@ import { ErrorCodes } from '@/lib/types/api'
 import { League } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 export async function GET(request: NextRequest) {
   try {

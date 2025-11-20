@@ -4,6 +4,7 @@ import { loginSchema } from '@/lib/utils/validation'
 import { ErrorCodes } from '@/lib/types/api'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 /**
  * POST /api/auth/login

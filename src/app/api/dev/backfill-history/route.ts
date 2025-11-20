@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { backfillAllStocks } from '@/lib/services/historicalDataCollector'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 /**
  * POST /api/dev/backfill-history

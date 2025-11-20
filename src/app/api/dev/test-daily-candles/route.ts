@@ -8,6 +8,7 @@ import { createDailyCandles } from '@/lib/services/stockPriceCollector'
 import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 /**
  * POST /api/dev/test-daily-candles

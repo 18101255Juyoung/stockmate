@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma'
 import { aggregateToWeekly } from '@/lib/utils/chartAggregation'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 /**
  * GET /api/stocks/[code]/chart

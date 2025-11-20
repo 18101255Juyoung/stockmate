@@ -9,6 +9,7 @@ import { deleteComment } from '@/lib/services/commentService'
 import { ErrorCodes } from '@/lib/types/api'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 /**
  * DELETE /api/posts/[id]/comments/[commentId]

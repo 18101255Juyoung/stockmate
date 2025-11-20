@@ -8,6 +8,7 @@ import { backfillAllStocks, backfillStock } from '@/lib/services/historicalDataC
 import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 /**
  * POST /api/dev/backfill

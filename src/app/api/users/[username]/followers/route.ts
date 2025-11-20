@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma'
 import { ErrorCodes } from '@/lib/types/api'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 export async function GET(
   request: NextRequest,

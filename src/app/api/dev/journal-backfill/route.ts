@@ -20,6 +20,7 @@ import {
 } from '@/lib/services/journalBackfillService'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 /**
  * GET - Check backfill status

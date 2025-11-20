@@ -8,6 +8,7 @@ import { updateRankings } from '@/lib/services/rankingService'
 import { ErrorCodes } from '@/lib/types/api'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
   try {

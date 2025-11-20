@@ -10,6 +10,7 @@ import { createPost, getPosts } from '@/lib/services/postService'
 import { ErrorCodes } from '@/lib/types/api'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 /**
  * GET /api/posts

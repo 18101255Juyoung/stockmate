@@ -5,6 +5,7 @@ import { ErrorCodes } from '@/lib/types/api'
 import { ZodError } from 'zod'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 /**
  * POST /api/auth/register

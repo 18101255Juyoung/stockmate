@@ -13,6 +13,7 @@ import { KSTDate } from '@/lib/utils/kst-date'
 const prisma = new PrismaClient()
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 /**
  * POST /api/portfolio/analysis/generate

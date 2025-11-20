@@ -11,6 +11,7 @@ import { generateMarketAnalysis } from '@/lib/services/aiAdvisorService'
 import { KSTDate } from '@/lib/utils/kst-date'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
   // Verify authorization

@@ -10,6 +10,7 @@ import { verifyCronAuth, createUnauthorizedResponse } from '@/lib/utils/cronAuth
 import { triggerMidnightTasks } from '@/lib/scheduler'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
   // Verify authorization

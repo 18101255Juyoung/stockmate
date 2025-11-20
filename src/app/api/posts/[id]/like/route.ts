@@ -9,6 +9,7 @@ import { toggleLike } from '@/lib/services/likeService'
 import { ErrorCodes } from '@/lib/types/api'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 /**
  * POST /api/posts/[id]/like

@@ -18,6 +18,7 @@ import { updateRankings } from '@/lib/services/rankingService'
 import { generateDailyPortfolioAnalysisForAllUsers } from '@/lib/services/portfolioAnalysisService'
 import { generateMarketAnalysis } from '@/lib/services/aiAdvisorService'
 import { KSTDate } from '@/lib/utils/kst-date'
+import { runDailyMidnightTasks } from '@/lib/scheduler/dailyTasks'
 
 let isSchedulerRunning = false
 const jobs: schedule.Job[] = []
@@ -39,6 +40,26 @@ export function startScheduler() {
   }
 
   console.log('⏰ Starting stock price scheduler...')
+
+  // Job 0: Daily midnight tasks at 00:00 (league classification, rewards, snapshots)
+  // Cron pattern: 0 0 * * * (00:00, every day)
+  const midnightTaskJob = schedule.scheduleJob('0 0 * * *', { tz: 'Asia/Seoul' }, async () => {
+    console.log('\n🌙 [Scheduled] Running daily midnight tasks...')
+    try {
+      const result = await runDailyMidnightTasks()
+
+      if (result.success) {
+        console.log('✅ [Scheduled] All midnight tasks completed successfully')
+      } else {
+        console.error('⚠️  [Scheduled] Some midnight tasks failed:', result.errors)
+      }
+    } catch (error) {
+      console.error('❌ [Scheduled] Midnight tasks failed:', error)
+    }
+  })
+
+  jobs.push(midnightTaskJob)
+  console.log('  ✓ Midnight task job scheduled: 00:00 (daily) - League classification, rewards, baseline snapshots')
 
   // Job 1: Update prices every 5 minutes during market hours
   // Cron pattern: */5 9-15 * * 1-5 (every 5 min, 09:00-15:59, Mon-Fri)
@@ -95,6 +116,7 @@ export function startScheduler() {
       console.log('\n📰 [Scheduled] Generating market analysis...')
       try {
         const kstToday = KSTDate.today()
+        // Validation logic will auto-regenerate if data is invalid
         const analysis = await generateMarketAnalysis(kstToday)
         console.log('✅ [Scheduled] Market analysis generated successfully')
       } catch (error) {
@@ -232,6 +254,7 @@ export function startScheduler() {
 
   // Log next scheduled runs
   console.log('📅 Next scheduled runs:')
+  console.log(`  Midnight tasks: ${midnightTaskJob.nextInvocation()?.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) || 'Not scheduled'}`)
   console.log(`  Price update: ${priceUpdateJob.nextInvocation()?.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) || 'Not scheduled'}`)
   console.log(`  Daily candle: ${dailyCandleJob.nextInvocation()?.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) || 'Not scheduled'}`)
   console.log(`  Market analysis: ${marketAnalysisJob.nextInvocation()?.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) || 'Not scheduled'}`)
@@ -342,6 +365,27 @@ export async function triggerRankingUpdate() {
     return results
   } catch (error) {
     console.error('❌ [Manual] Ranking update failed:', error)
+    throw error
+  }
+}
+
+/**
+ * Manually trigger midnight tasks (for development/testing)
+ */
+export async function triggerMidnightTasks() {
+  console.log('🔧 [Manual] Triggering midnight tasks...')
+  try {
+    const result = await runDailyMidnightTasks()
+
+    if (result.success) {
+      console.log('✅ [Manual] All midnight tasks completed successfully')
+    } else {
+      console.error('⚠️  [Manual] Some midnight tasks failed:', result.errors)
+    }
+
+    return result
+  } catch (error) {
+    console.error('❌ [Manual] Midnight tasks failed:', error)
     throw error
   }
 }

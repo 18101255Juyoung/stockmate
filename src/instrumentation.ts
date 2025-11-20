@@ -39,6 +39,23 @@ export async function register() {
               }
             }
 
+            // Step 1.6: Auto-backfill missing journal analysis (optional, configurable)
+            if (process.env.AUTO_BACKFILL_JOURNAL !== 'false') {
+              console.log('\n📔 [Instrumentation] Checking for missing journal analysis...')
+              const { autoBackfillAll } = await import('@/lib/services/journalBackfillService')
+              const maxDays = parseInt(process.env.AUTO_BACKFILL_JOURNAL_DAYS || '7', 10)
+              const result = await autoBackfillAll(maxDays)
+
+              if (result.totalDays === 0) {
+                console.log('✅ [Instrumentation] Journal analysis up to date')
+              } else {
+                console.log(`✅ [Instrumentation] Journal backfill completed: ${result.successful}/${result.totalDays} days`)
+                if (result.failed > 0) {
+                  console.log(`⚠️  [Instrumentation] ${result.failed} days failed`)
+                }
+              }
+            }
+
             // Step 2: Start scheduler
             console.log('⏰ [Instrumentation] Starting scheduler...')
             startScheduler()
@@ -80,20 +97,10 @@ export async function register() {
 
               // Task 2: Market Analysis (15:35 이후면 생성)
               if (timeInMinutes >= 15 * 60 + 35) {
-                const { prisma } = await import('@/lib/prisma')
-
-                const existingAnalysis = await prisma.marketAnalysis.findUnique({
-                  where: { date: today }
-                })
-
-                if (!existingAnalysis) {
-                  console.log('  📰 Generating market analysis...')
-                  const { generateMarketAnalysis } = await import('@/lib/services/aiAdvisorService')
-                  await generateMarketAnalysis(today)
-                  console.log('  ✅ Market analysis completed')
-                } else {
-                  console.log('  ℹ️  Market analysis already exists')
-                }
+                console.log('  📰 Generating market analysis...')
+                const { generateMarketAnalysis } = await import('@/lib/services/aiAdvisorService')
+                await generateMarketAnalysis(today)
+                console.log('  ✅ Market analysis completed')
               }
 
               // Task 3: Portfolio Snapshots (15:40 이후면 생성) - CRITICAL

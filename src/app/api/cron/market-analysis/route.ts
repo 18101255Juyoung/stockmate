@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const kstToday = KSTDate.today()
-    const analysis = await generateMarketAnalysis(kstToday, { force: true })
+    const analysis = await generateMarketAnalysis(kstToday)
 
     console.log('✅ [Cron API] Market analysis generated successfully')
     return Response.json({

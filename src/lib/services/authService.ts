@@ -2,7 +2,8 @@ import bcrypt from 'bcrypt'
 import { prisma } from '@/lib/prisma'
 import { RegisterInput, LoginInput } from '@/lib/utils/validation'
 import { ApiResponse, ErrorCodes } from '@/lib/types/api'
-import { Prisma } from '@prisma/client'
+import { Prisma, CapitalChangeReason } from '@prisma/client'
+import { applyReferralBonus } from '@/lib/services/referralService'
 
 const SALT_ROUNDS = 10
 
@@ -35,6 +36,7 @@ export async function registerUser(
           username: true,
           displayName: true,
           createdAt: true,
+          initialCapital: true,
         },
       })
 
@@ -48,11 +50,42 @@ export async function registerUser(
           totalReturn: 0,
           realizedPL: 0,
           unrealizedPL: 0,
+          weeklyStartAssets: 10000000,  // Initialize for period-based rankings
+          monthlyStartAssets: 10000000, // Initialize for period-based rankings
+        },
+      })
+
+      // Create initial capital history record
+      await tx.capitalHistory.create({
+        data: {
+          userId: user.id,
+          amount: new Prisma.Decimal(10000000),
+          newTotal: new Prisma.Decimal(10000000),
+          reason: CapitalChangeReason.INITIAL,
+          description: 'Initial capital from account creation',
         },
       })
 
       return user
     })
+
+    // Apply referral bonus if referral code was provided (trim and check for empty string)
+    const trimmedReferralCode = data.referralCode?.trim()
+    if (trimmedReferralCode && trimmedReferralCode !== '') {
+      const referralResult = await applyReferralBonus(result.id, trimmedReferralCode)
+
+      if (!referralResult.success) {
+        console.warn(
+          `Referral bonus failed for user ${result.username}:`,
+          referralResult.error
+        )
+        // Don't fail registration if referral fails, just log it
+      } else {
+        console.log(
+          `✅ Referral bonus applied for user ${result.username} using code ${trimmedReferralCode}`
+        )
+      }
+    }
 
     return {
       success: true,

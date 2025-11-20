@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import PostCard from '@/components/community/PostCard'
@@ -44,11 +44,7 @@ export default function CommunityPage() {
     totalPages: 1,
   })
 
-  useEffect(() => {
-    fetchPosts()
-  }, [filter, currentPage])
-
-  const fetchPosts = async () => {
+  const fetchPosts = useCallback(async () => {
     setLoading(true)
     setError(null)
 
@@ -76,7 +72,11 @@ export default function CommunityPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filter, currentPage])
+
+  useEffect(() => {
+    fetchPosts()
+  }, [filter, currentPage, fetchPosts])
 
   const handleFilterChange = (newFilter: 'all' | 'verified' | 'stock_recommendation') => {
     setFilter(newFilter)

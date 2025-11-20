@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
 import PostForm from '@/components/community/PostForm'
@@ -15,16 +15,7 @@ export default function EditPostPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (status === 'loading') return
-    if (status === 'unauthenticated') {
-      router.push('/login')
-      return
-    }
-    fetchPost()
-  }, [status, postId, router])
-
-  const fetchPost = async () => {
+  const fetchPost = useCallback(async () => {
     try {
       const response = await fetch(`/api/posts/${postId}`)
       const data = await response.json()
@@ -45,7 +36,16 @@ export default function EditPostPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [postId, session])
+
+  useEffect(() => {
+    if (status === 'loading') return
+    if (status === 'unauthenticated') {
+      router.push('/login')
+      return
+    }
+    fetchPost()
+  }, [status, router, fetchPost])
 
   if (status === 'loading' || loading) {
     return (

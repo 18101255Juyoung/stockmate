@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
@@ -54,15 +54,7 @@ export default function PostDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchPost()
-    fetchComments()
-    if (session) {
-      fetchLikeStatus()
-    }
-  }, [postId, session])
-
-  const fetchPost = async () => {
+  const fetchPost = useCallback(async () => {
     try {
       const response = await fetch(`/api/posts/${postId}`)
       const data = await response.json()
@@ -78,9 +70,9 @@ export default function PostDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [postId])
 
-  const fetchComments = async () => {
+  const fetchComments = useCallback(async () => {
     try {
       const response = await fetch(`/api/posts/${postId}/comments`)
       const data = await response.json()
@@ -91,9 +83,9 @@ export default function PostDetailPage() {
     } catch (err) {
       console.error('Failed to fetch comments:', err)
     }
-  }
+  }, [postId])
 
-  const fetchLikeStatus = async () => {
+  const fetchLikeStatus = useCallback(async () => {
     try {
       const response = await fetch(`/api/posts/${postId}/like`)
       const data = await response.json()
@@ -104,7 +96,15 @@ export default function PostDetailPage() {
     } catch (err) {
       console.error('Failed to fetch like status:', err)
     }
-  }
+  }, [postId])
+
+  useEffect(() => {
+    fetchPost()
+    fetchComments()
+    if (session) {
+      fetchLikeStatus()
+    }
+  }, [fetchPost, fetchComments, fetchLikeStatus, session])
 
   const handleDelete = async () => {
     if (!confirm('게시글을 삭제하시겠습니까?')) {

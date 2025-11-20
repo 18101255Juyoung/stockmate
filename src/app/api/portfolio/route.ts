@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { getPortfolioSummary } from '@/lib/services/portfolioService'
 import { ErrorCodes } from '@/lib/types/api'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/portfolio
  * 포트폴리오 정보 조회

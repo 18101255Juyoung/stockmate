@@ -15,6 +15,7 @@ export default function RegisterPage() {
     password: '',
     username: '',
     displayName: '',
+    referralCode: '',
   })
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -32,12 +33,18 @@ export default function RegisterPage() {
     setIsLoading(true)
 
     try {
+      // Convert empty string to undefined for optional referralCode
+      const payload = {
+        ...formData,
+        referralCode: formData.referralCode.trim() || undefined,
+      }
+
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       })
 
       const data = await response.json()
@@ -147,6 +154,25 @@ export default function RegisterPage() {
               />
               <p className="mt-1 text-xs text-gray-500">
                 최소 8자, 대문자/소문자/숫자 포함
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="referralCode" className="block text-sm font-medium text-gray-700">
+                추천 코드 (선택)
+              </label>
+              <input
+                id="referralCode"
+                name="referralCode"
+                type="text"
+                value={formData.referralCode}
+                onChange={handleChange}
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                placeholder="추천인 코드 입력"
+                disabled={isLoading}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                추천 코드 입력 시 양쪽 모두 +3,000,000원 보너스
               </p>
             </div>
           </div>

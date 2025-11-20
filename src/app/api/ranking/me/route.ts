@@ -8,6 +8,8 @@ import { authOptions } from '@/lib/auth'
 import { getUserRank, type RankingPeriod } from '@/lib/services/rankingService'
 import { ErrorCodes } from '@/lib/types/api'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)

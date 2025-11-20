@@ -281,14 +281,92 @@ export function calculateCost(usage: any): number {
  */
 
 /**
+ * 시장 분석 데이터 유효성 검증
+ *
+ * @param analysis 검증할 시장 분석 객체
+ * @returns 유효하면 true, 그렇지 않으면 false
+ */
+export function validateMarketAnalysis(analysis: any): boolean {
+  try {
+    // 1. 날짜 일치 확인 - 분석 날짜와 데이터 수집 날짜가 같아야 함
+    if (analysis.marketData?.collectedAt) {
+      const dataDate = KSTDate.format(
+        KSTDate.fromDate(new Date(analysis.marketData.collectedAt))
+      )
+      const analysisDate = KSTDate.format(KSTDate.fromDate(analysis.date))
+
+      if (dataDate !== analysisDate) {
+        console.warn(
+          `⚠️ [Market Analysis Validation] Date mismatch: ` +
+          `data=${dataDate}, analysis=${analysisDate}`
+        )
+        return false
+      }
+    }
+
+    // 2. 필수 필드 확인 - KOSPI 데이터
+    if (!analysis.marketData?.indices?.kospi?.value) {
+      console.warn('⚠️ [Market Analysis Validation] Missing KOSPI data')
+      return false
+    }
+
+    // 3. 필수 필드 확인 - KOSDAQ 데이터
+    if (!analysis.marketData?.indices?.kosdaq?.value) {
+      console.warn('⚠️ [Market Analysis Validation] Missing KOSDAQ data')
+      return false
+    }
+
+    // 4. 데이터 범위 검증 - KOSPI는 1000-5000 사이
+    const kospi = analysis.marketData.indices.kospi.value
+    if (kospi < 1000 || kospi > 5000) {
+      console.warn(
+        `⚠️ [Market Analysis Validation] Abnormal KOSPI value: ${kospi}`
+      )
+      return false
+    }
+
+    // 5. 데이터 범위 검증 - KOSDAQ는 500-2000 사이
+    const kosdaq = analysis.marketData.indices.kosdaq.value
+    if (kosdaq < 500 || kosdaq > 2000) {
+      console.warn(
+        `⚠️ [Market Analysis Validation] Abnormal KOSDAQ value: ${kosdaq}`
+      )
+      return false
+    }
+
+    // 6. 분석 내용 확인
+    if (!analysis.analysis || analysis.analysis.length < 50) {
+      console.warn('⚠️ [Market Analysis Validation] Missing or too short analysis')
+      return false
+    }
+
+    // 7. 요약 확인
+    if (!analysis.summary || analysis.summary.length < 20) {
+      console.warn('⚠️ [Market Analysis Validation] Missing or too short summary')
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error('❌ [Market Analysis Validation] Error during validation:', error)
+    return false
+  }
+}
+
+/**
  * Stage 1: 시장 전체 분석 생성 (하루 1회)
  * KIS API로 시장 데이터를 수집하고 AI가 시장 상황을 분석
  * 결과는 MarketAnalysis 테이블에 저장되어 모든 사용자가 공유
  *
  * @param date 분석 날짜 (KST)
+ * @param options 옵션 객체
+ * @param options.force true일 경우 기존 데이터를 삭제하고 재생성
  * @returns 시장 분석 결과
  */
-export async function generateMarketAnalysis(date: Date) {
+export async function generateMarketAnalysis(
+  date: Date,
+  options?: { force?: boolean }
+) {
   try {
     const analysisDate = KSTDate.fromDate(date)
 
@@ -298,8 +376,27 @@ export async function generateMarketAnalysis(date: Date) {
     })
 
     if (existing) {
-      console.log(`[Market Analysis] Already exists for ${analysisDate.toISOString()}`)
-      return existing
+      if (options?.force) {
+        console.log(`[Market Analysis] Force regeneration for ${analysisDate.toISOString()}`)
+        await prisma.marketAnalysis.delete({
+          where: { date: analysisDate },
+        })
+      } else {
+        // 기존 데이터 검증
+        const isValid = validateMarketAnalysis(existing)
+
+        if (isValid) {
+          console.log(`[Market Analysis] Already exists for ${analysisDate.toISOString()}`)
+          return existing
+        } else {
+          console.log(
+            `🔄 [Market Analysis] Invalid data detected for ${analysisDate.toISOString()} - regenerating...`
+          )
+          await prisma.marketAnalysis.delete({
+            where: { date: analysisDate },
+          })
+        }
+      }
     }
 
     // 2. 시장 데이터 수집
@@ -355,6 +452,13 @@ export async function generateMarketAnalysis(date: Date) {
     })
 
     console.log('[Market Analysis] 💾 Saved to database - ID:', analysis.id)
+
+    // Post-generation validation
+    const isValidAfterCreation = validateMarketAnalysis(analysis)
+    if (!isValidAfterCreation) {
+      console.error('🚨 [Market Analysis] CRITICAL: Newly generated data failed validation!')
+      console.error('🚨 This should not happen. Please check data collection and AI generation logic.')
+    }
 
     console.log(`[Market Analysis] ✅ Created for ${analysisDate.toISOString()} (${tokensUsed} tokens, $${cost})`)
 

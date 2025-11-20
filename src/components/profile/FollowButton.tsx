@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 
@@ -22,14 +22,7 @@ export default function FollowButton({
   const [isFollowing, setIsFollowing] = useState(initialIsFollowing)
   const [isLoading, setIsLoading] = useState(false)
 
-  // Fetch follow status on mount
-  useEffect(() => {
-    if (status === 'authenticated' && session?.user?.id) {
-      fetchFollowStatus()
-    }
-  }, [status, session, username])
-
-  const fetchFollowStatus = async () => {
+  const fetchFollowStatus = useCallback(async () => {
     try {
       const res = await fetch(`/api/users/${username}/follow-status`)
       if (res.ok) {
@@ -41,7 +34,14 @@ export default function FollowButton({
     } catch (error) {
       console.error('Error fetching follow status:', error)
     }
-  }
+  }, [username])
+
+  // Fetch follow status on mount
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user?.id) {
+      fetchFollowStatus()
+    }
+  }, [status, session, fetchFollowStatus])
 
   const handleFollow = async () => {
     if (status !== 'authenticated') {

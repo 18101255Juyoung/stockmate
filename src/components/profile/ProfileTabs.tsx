@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import PostCard from '@/components/community/PostCard'
 
 interface ProfileTabsProps {
@@ -34,11 +34,7 @@ export default function ProfileTabs({ username }: ProfileTabsProps) {
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadUserContent()
-  }, [username])
-
-  const loadUserContent = async () => {
+  const loadUserContent = useCallback(async () => {
     setLoading(true)
     try {
       // First, get user info to get userId from username
@@ -64,7 +60,11 @@ export default function ProfileTabs({ username }: ProfileTabsProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [username])
+
+  useEffect(() => {
+    loadUserContent()
+  }, [username, loadUserContent])
 
   return (
     <div className="w-full">

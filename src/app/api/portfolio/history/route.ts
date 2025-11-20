@@ -7,6 +7,8 @@ import {
 } from '@/lib/services/portfolioHistoryService'
 import { ErrorCodes } from '@/lib/types/api'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/portfolio/history
  * 포트폴리오 히스토리 조회 (Transaction 기반)

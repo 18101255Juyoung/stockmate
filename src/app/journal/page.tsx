@@ -5,9 +5,9 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import JournalDateCard from '@/components/journal/JournalDateCard'
 import { toKSTDateOnly } from '@/lib/utils/timezone'
@@ -44,7 +44,6 @@ const ITEMS_PER_PAGE = 10
 
 export default function JournalListPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { data: session, status } = useSession()
 
   const [allData, setAllData] = useState<DailyData[]>([])
@@ -59,14 +58,7 @@ export default function JournalListPage() {
     }
   }, [status, router])
 
-  // 데이터 로드
-  useEffect(() => {
-    if (status === 'authenticated') {
-      loadJournalList()
-    }
-  }, [status])
-
-  async function loadJournalList() {
+  const loadJournalList = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -154,7 +146,14 @@ export default function JournalListPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  // 데이터 로드
+  useEffect(() => {
+    if (status === 'authenticated') {
+      loadJournalList()
+    }
+  }, [status, loadJournalList])
 
   // 페이지네이션 계산
   const totalPages = Math.ceil(allData.length / ITEMS_PER_PAGE)

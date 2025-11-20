@@ -83,6 +83,7 @@ export default function TradingPage() {
     }
 
     loadDefaultStock()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status])
 
   // Calculate chart data with moving averages

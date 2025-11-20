@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import FollowList from '@/components/profile/FollowList'
 
@@ -21,11 +21,7 @@ export default function FollowersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchUserProfile()
-  }, [username])
-
-  const fetchUserProfile = async () => {
+  const fetchUserProfile = useCallback(async () => {
     try {
       const response = await fetch(`/api/users/${username}`)
       const data = await response.json()
@@ -41,7 +37,11 @@ export default function FollowersPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [username])
+
+  useEffect(() => {
+    fetchUserProfile()
+  }, [username, fetchUserProfile])
 
   if (loading) {
     return (

@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import ProfileHeader from '@/components/profile/ProfileHeader'
 import ProfileStats from '@/components/profile/ProfileStats'
 import ProfileTabs from '@/components/profile/ProfileTabs'
+import ReferralCard from '@/components/profile/ReferralCard'
 
 interface UserData {
   id: string
@@ -33,17 +35,17 @@ export default function ProfilePage() {
   const router = useRouter()
   const params = useParams()
   const username = params.username as string
+  const { data: session } = useSession()
 
   const [user, setUser] = useState<UserData | null>(null)
   const [portfolio, setPortfolio] = useState<PortfolioData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchUserProfile()
-  }, [username])
+  // Check if viewing own profile
+  const isOwnProfile = session?.user?.username === username
 
-  const fetchUserProfile = async () => {
+  const fetchUserProfile = useCallback(async () => {
     try {
       const response = await fetch(`/api/users/${username}`)
       const data = await response.json()
@@ -60,7 +62,11 @@ export default function ProfilePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [username])
+
+  useEffect(() => {
+    fetchUserProfile()
+  }, [username, fetchUserProfile])
 
   if (loading) {
     return (
@@ -95,6 +101,10 @@ export default function ProfilePage() {
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="space-y-6">
           <ProfileStats portfolio={portfolio} />
+
+          {/* Referral Card - Only for own profile */}
+          {isOwnProfile && <ReferralCard />}
+
           <ProfileTabs username={username} />
         </div>
       </div>

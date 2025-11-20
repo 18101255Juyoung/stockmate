@@ -22,6 +22,10 @@ export const registerSchema = z.object({
     .string()
     .min(1, { message: 'Display name is required' })
     .max(50, { message: 'Display name must be at most 50 characters' }),
+  referralCode: z.preprocess(
+    (val) => (val === '' ? undefined : val),
+    z.string().optional()
+  ), // Optional referral code - converts empty string to undefined
 })
 
 export type RegisterInput = z.infer<typeof registerSchema>

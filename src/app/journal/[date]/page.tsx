@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
@@ -14,6 +14,7 @@ import AIAnalysisSummary from '@/components/journal/AIAnalysisSummary'
 import AIAnalysisModal from '@/components/journal/AIAnalysisModal'
 import TransactionList from '@/components/journal/TransactionList'
 import { toKSTDateOnly } from '@/lib/utils/timezone'
+import { KSTDate } from '@/lib/utils/kst-date'
 
 interface Transaction {
   id: string
@@ -92,14 +93,7 @@ export default function JournalDetailPage() {
     }
   }, [status, router])
 
-  // 데이터 로드
-  useEffect(() => {
-    if (status === 'authenticated' && params.date) {
-      loadDetailData(params.date as string)
-    }
-  }, [status, params.date])
-
-  async function loadDetailData(dateStr: string) {
+  const loadDetailData = useCallback(async (dateStr: string) => {
     try {
       setLoading(true)
       setError(null)
@@ -191,16 +185,24 @@ export default function JournalDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  // 데이터 로드
+  useEffect(() => {
+    if (status === 'authenticated' && params.date) {
+      loadDetailData(params.date as string)
+    }
+  }, [status, params.date, loadDetailData])
 
   // 이전/다음 날짜 이동
   function navigateToDate(offset: number) {
     if (!dateObj) return
 
-    const newDate = new Date(dateObj)
-    newDate.setDate(newDate.getDate() + offset)
+    // Use KSTDate for timezone-safe date arithmetic
+    const currentKSTDate = KSTDate.fromDate(dateObj)
+    const newKSTDate = KSTDate.addDays(currentKSTDate, offset)
+    const newDateStr = KSTDate.format(newKSTDate)
 
-    const newDateStr = newDate.toISOString().split('T')[0]
     router.push(`/journal/${newDateStr}`)
   }
 

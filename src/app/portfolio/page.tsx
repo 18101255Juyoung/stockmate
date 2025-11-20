@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
@@ -45,8 +45,29 @@ export default function PortfolioPage() {
   const [historyLoading, setHistoryLoading] = useState(false)
   const [selectedPeriod, setSelectedPeriod] = useState<Period>('30d')
 
+  // 포트폴리오 히스토리 조회
+  const fetchPortfolioHistory = useCallback(async (period: Period) => {
+    setHistoryLoading(true)
+    try {
+      const response = await fetch(`/api/portfolio/history?period=${period}`)
+      const data = await response.json()
+
+      if (data.success) {
+        setHistory(data.data.history)
+      } else {
+        console.error('Failed to fetch history:', data.error)
+        setHistory([])
+      }
+    } catch (err) {
+      console.error('History fetch error:', err)
+      setHistory([])
+    } finally {
+      setHistoryLoading(false)
+    }
+  }, [])
+
   // 포트폴리오 조회
-  const fetchPortfolio = async () => {
+  const fetchPortfolio = useCallback(async () => {
     setLoading(true)
     setError(null)
 
@@ -71,28 +92,7 @@ export default function PortfolioPage() {
     } finally {
       setLoading(false)
     }
-  }
-
-  // 포트폴리오 히스토리 조회
-  const fetchPortfolioHistory = async (period: Period) => {
-    setHistoryLoading(true)
-    try {
-      const response = await fetch(`/api/portfolio/history?period=${period}`)
-      const data = await response.json()
-
-      if (data.success) {
-        setHistory(data.data.history)
-      } else {
-        console.error('Failed to fetch history:', data.error)
-        setHistory([])
-      }
-    } catch (err) {
-      console.error('History fetch error:', err)
-      setHistory([])
-    } finally {
-      setHistoryLoading(false)
-    }
-  }
+  }, [router, fetchPortfolioHistory, selectedPeriod])
 
   // 인증 상태 확인 및 리다이렉트
   useEffect(() => {
@@ -103,14 +103,14 @@ export default function PortfolioPage() {
     } else if (status === 'authenticated') {
       fetchPortfolio()
     }
-  }, [status])
+  }, [status, router, fetchPortfolio])
 
   // Period 변경 시 히스토리 다시 가져오기
   useEffect(() => {
     if (portfolio) {
       fetchPortfolioHistory(selectedPeriod)
     }
-  }, [selectedPeriod])
+  }, [selectedPeriod, portfolio, fetchPortfolioHistory])
 
   // 로딩 중
   if (status === 'loading' || loading) {

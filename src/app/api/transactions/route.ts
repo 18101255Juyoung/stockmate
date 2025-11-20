@@ -11,6 +11,8 @@ import { ErrorCodes } from '@/lib/types/api'
 import { KSTDate } from '@/lib/utils/kst-date'
 import { DateQuery } from '@/lib/db/queries'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     // Check authentication

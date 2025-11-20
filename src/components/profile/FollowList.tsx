@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import FollowButton from './FollowButton'
 
@@ -26,13 +26,7 @@ export default function FollowList({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (initialUsers.length === 0) {
-      fetchUsers()
-    }
-  }, [username, type])
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setIsLoading(true)
     setError(null)
 
@@ -63,7 +57,13 @@ export default function FollowList({
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [username, type])
+
+  useEffect(() => {
+    if (initialUsers.length === 0) {
+      fetchUsers()
+    }
+  }, [initialUsers.length, fetchUsers])
 
   const handleFollowChange = () => {
     // Refresh the list when follow status changes

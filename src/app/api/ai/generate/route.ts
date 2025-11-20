@@ -13,6 +13,8 @@ import { ErrorCodes } from '@/lib/types/api'
 import { generateMarketAnalysis, generatePersonalizedAnalysis } from '@/lib/services/aiAdvisorService'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   try {
     // 1. Authentication check

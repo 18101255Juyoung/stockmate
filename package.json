@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "postinstall": "prisma generate",
     "lint": "next lint",
     "format": "prettier --write .",
     "test": "cross-env DATABASE_URL=\"postgresql://postgres:wnthdud12@localhost:5432/stockmate_test\" NODE_ENV=test jest",

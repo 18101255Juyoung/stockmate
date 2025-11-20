@@ -8,6 +8,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateDailyAnalysisForAllUsers } from '@/lib/services/aiAdvisorService'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   try {
     // TODO: 프로덕션 배포 시 Vercel Cron Secret 검증 추가

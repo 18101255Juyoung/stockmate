@@ -7,6 +7,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { updateRankings } from '@/lib/services/rankingService'
 import { ErrorCodes } from '@/lib/types/api'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   try {
     // Verify cron job authorization (optional but recommended)

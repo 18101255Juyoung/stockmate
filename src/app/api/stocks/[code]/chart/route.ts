@@ -7,6 +7,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { aggregateToWeekly } from '@/lib/utils/chartAggregation'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/stocks/[code]/chart
  * Get historical price data (OHLCV) for chart display

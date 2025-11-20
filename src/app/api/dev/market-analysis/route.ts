@@ -9,6 +9,8 @@ import { generateMarketAnalysis } from '@/lib/services/aiAdvisorService'
 import { KSTDate } from '@/lib/utils/kst-date'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   try {
     // Only allow in development

@@ -7,6 +7,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { backfillAllStocks, backfillStock } from '@/lib/services/historicalDataCollector'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * POST /api/dev/backfill
  * Manually trigger historical data backfill

@@ -6,6 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { triggerPriceUpdate, triggerDailyCandleCreation } from '@/lib/scheduler'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * POST /api/dev/update-prices
  * Manually trigger stock price update

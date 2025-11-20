@@ -7,6 +7,8 @@ import { getFollowing } from '@/lib/services/followService'
 import { prisma } from '@/lib/prisma'
 import { ErrorCodes } from '@/lib/types/api'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { username: string } }

@@ -7,6 +7,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getStockPrice } from '@/lib/services/stockService'
 import { ErrorCodes } from '@/lib/types/api'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: { code: string } }

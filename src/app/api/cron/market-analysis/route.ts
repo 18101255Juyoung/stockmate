@@ -10,6 +10,8 @@ import { verifyCronAuth, createUnauthorizedResponse } from '@/lib/utils/cronAuth
 import { generateMarketAnalysis } from '@/lib/services/aiAdvisorService'
 import { KSTDate } from '@/lib/utils/kst-date'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   // Verify authorization
   if (!verifyCronAuth(request)) {

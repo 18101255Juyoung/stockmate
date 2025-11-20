@@ -3,6 +3,8 @@ import { loginUser } from '@/lib/services/authService'
 import { loginSchema } from '@/lib/utils/validation'
 import { ErrorCodes } from '@/lib/types/api'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * POST /api/auth/login
  * Authenticate a user with email and password

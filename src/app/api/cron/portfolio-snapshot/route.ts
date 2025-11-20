@@ -9,6 +9,8 @@ import { NextRequest } from 'next/server'
 import { verifyCronAuth, createUnauthorizedResponse } from '@/lib/utils/cronAuth'
 import { triggerSnapshotCreation } from '@/lib/scheduler'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   // Verify authorization
   if (!verifyCronAuth(request)) {

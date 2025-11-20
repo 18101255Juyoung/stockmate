@@ -4,6 +4,8 @@ import { registerSchema } from '@/lib/utils/validation'
 import { ErrorCodes } from '@/lib/types/api'
 import { ZodError } from 'zod'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * POST /api/auth/register
  * Register a new user

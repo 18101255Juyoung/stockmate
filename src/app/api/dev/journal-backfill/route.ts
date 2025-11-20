@@ -19,6 +19,8 @@ import {
   backfillDateRange,
 } from '@/lib/services/journalBackfillService'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET - Check backfill status
  * Returns information about missing dates in the last N days

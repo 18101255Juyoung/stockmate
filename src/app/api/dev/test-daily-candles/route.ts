@@ -7,6 +7,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createDailyCandles } from '@/lib/services/stockPriceCollector'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * POST /api/dev/test-daily-candles
  * Tests the updated createDailyCandles() function and verifies the fix

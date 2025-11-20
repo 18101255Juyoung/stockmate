@@ -8,6 +8,8 @@ import { authOptions } from '@/lib/auth'
 import { toggleLike } from '@/lib/services/likeService'
 import { ErrorCodes } from '@/lib/types/api'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * POST /api/posts/[id]/like
  * Toggle like on a post (requires authentication)

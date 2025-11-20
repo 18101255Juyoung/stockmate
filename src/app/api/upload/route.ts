@@ -4,6 +4,8 @@ import path from 'path'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * Image Upload API
  * POST /api/upload

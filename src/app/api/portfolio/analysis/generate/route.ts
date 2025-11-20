@@ -12,6 +12,8 @@ import { KSTDate } from '@/lib/utils/kst-date'
 
 const prisma = new PrismaClient()
 
+export const dynamic = 'force-dynamic'
+
 /**
  * POST /api/portfolio/analysis/generate
  * Body: { date?: string } (YYYY-MM-DD, optional, default: today)

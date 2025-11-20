@@ -8,6 +8,8 @@ import { authOptions } from '@/lib/auth'
 import { verifyPost } from '@/lib/services/investmentVerificationService'
 import { ErrorCodes } from '@/lib/types/api'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * POST /api/posts/[id]/verify
  * Verify a post by linking it to transactions (requires authentication)

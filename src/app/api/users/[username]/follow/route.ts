@@ -9,6 +9,8 @@ import { followUser } from '@/lib/services/followService'
 import { prisma } from '@/lib/prisma'
 import { ErrorCodes } from '@/lib/types/api'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { username: string } }

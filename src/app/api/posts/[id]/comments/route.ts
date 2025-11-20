@@ -9,6 +9,8 @@ import { authOptions } from '@/lib/auth'
 import { createComment, getComments } from '@/lib/services/commentService'
 import { ErrorCodes } from '@/lib/types/api'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/posts/[id]/comments
  * Get all comments for a post

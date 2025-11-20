@@ -9,6 +9,8 @@ import { authOptions } from '@/lib/auth'
 import { createPost, getPosts } from '@/lib/services/postService'
 import { ErrorCodes } from '@/lib/types/api'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/posts
  * Get posts list with pagination and filtering

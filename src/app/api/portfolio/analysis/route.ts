@@ -13,6 +13,8 @@ import { KSTDate } from '@/lib/utils/kst-date'
 
 const prisma = new PrismaClient()
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/portfolio/analysis
  * Query params:

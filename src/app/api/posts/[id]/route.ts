@@ -14,6 +14,8 @@ import {
 } from '@/lib/services/postService'
 import { ErrorCodes } from '@/lib/types/api'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/posts/[id]
  * Get a single post by ID

@@ -9,6 +9,8 @@ import { prisma } from '@/lib/prisma'
 import { KSTDate } from '@/lib/utils/kst-date'
 import { generateMarketAnalysis } from '@/lib/services/aiAdvisorService'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { date: string } }

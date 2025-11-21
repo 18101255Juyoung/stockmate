@@ -45,8 +45,9 @@ next-env.d.ts
 claude_desktop_config.json
 
 # database backups
-/backups/*.sql
-/backups/*.dump
+/backups/
+*_dump.sql
+*_backup*.sql
 
 # debug & test scripts (개발/디버깅용 임시 파일)
 check-*.js

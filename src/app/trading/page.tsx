@@ -56,6 +56,10 @@ export default function TradingPage() {
   const [tradeLoading, setTradeLoading] = useState(false)
   const [tradeSuccess, setTradeSuccess] = useState<string | null>(null)
 
+  // Auto-refresh state
+  const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date())
+  const [isAutoRefreshing, setIsAutoRefreshing] = useState(false)
+
   // Authentication check
   useEffect(() => {
     if (status === 'loading') return
@@ -85,6 +89,63 @@ export default function TradingPage() {
     loadDefaultStock()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status])
+
+  // Auto-refresh during market hours (09:00-15:30 KST, Mon-Fri)
+  useEffect(() => {
+    if (!selectedStock) return
+
+    // Check if market is open
+    const checkMarketOpen = () => {
+      const now = new Date()
+      const kstTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }))
+      const day = kstTime.getDay() // 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat
+      const hour = kstTime.getHours()
+      const minute = kstTime.getMinutes()
+
+      // Weekend check
+      if (day === 0 || day === 6) return false
+
+      // Time check (09:00-15:30)
+      const timeInMinutes = hour * 60 + minute
+      const marketOpen = 9 * 60 // 09:00
+      const marketClose = 15 * 60 + 30 // 15:30
+
+      return timeInMinutes >= marketOpen && timeInMinutes <= marketClose
+    }
+
+    if (!checkMarketOpen()) {
+      setIsAutoRefreshing(false)
+      return
+    }
+
+    setIsAutoRefreshing(true)
+
+    // Auto-refresh every 30 seconds during market hours
+    const intervalId = setInterval(async () => {
+      try {
+        // Refresh stock price
+        const response = await fetch(`/api/stocks/${selectedStock.stockCode}`)
+        const data = await response.json()
+        if (data.success && data.data) {
+          setSelectedStock(data.data)
+          setLastUpdateTime(new Date())
+        }
+
+        // Refresh chart data
+        const chartResponse = await fetch(
+          `/api/stocks/${selectedStock.stockCode}/chart?days=${chartPeriod}&timeframe=${chartTimeframe}`
+        )
+        const chartData = await chartResponse.json()
+        if (chartData.success && chartData.data.chartData) {
+          setChartData(chartData.data.chartData)
+        }
+      } catch (err) {
+        console.error('Failed to auto-refresh:', err)
+      }
+    }, 30000) // 30 seconds
+
+    return () => clearInterval(intervalId)
+  }, [selectedStock, chartPeriod, chartTimeframe])
 
   // Calculate chart data with moving averages
   const chartDataWithMA = useMemo(() => {
@@ -382,6 +443,17 @@ export default function TradingPage() {
                 {selectedStock.changeRate > 0 ? '+' : ''}
                 {selectedStock.changeRate.toFixed(2)}%)
               </div>
+            </div>
+
+            {/* 실시간 업데이트 표시 */}
+            <div className="text-xs text-gray-500 mt-2 flex items-center gap-2">
+              <span>마지막 업데이트: {lastUpdateTime.toLocaleTimeString('ko-KR')}</span>
+              {isAutoRefreshing && (
+                <span className="flex items-center gap-1 text-green-600">
+                  <span className="inline-block w-2 h-2 bg-green-600 rounded-full animate-pulse"></span>
+                  실시간
+                </span>
+              )}
             </div>
           </div>
 

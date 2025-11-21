@@ -45,19 +45,21 @@ export async function getStockPrice(code: string): Promise<StockPrice> {
 
     // If stock exists in DB and has valid price data, use it
     if (stock && stock.currentPrice > 0 && stock.priceUpdatedAt) {
-      // Try to get the most recent OHLC from StockPriceHistory (accurate data)
-      // Use today's data if available, otherwise use the most recent available data
-      const latestCandle = await prisma.stockPriceHistory.findFirst({
+      // Get today's date first
+      const today = KSTDate.today()
+
+      // Try to get today's candle specifically (not yesterday's)
+      // This ensures we show today's OHLC data, not previous day's
+      const todayCandle = await prisma.stockPriceHistory.findUnique({
         where: {
-          stockCode: code,
-        },
-        orderBy: {
-          date: 'desc',
+          stockCode_date: {
+            stockCode: code,
+            date: today,
+          },
         },
       })
 
       // Get previous day's candle for calculating change (exclude today)
-      const today = KSTDate.today()
       const previousCandle = await prisma.stockPriceHistory.findFirst({
         where: {
           stockCode: code,
@@ -68,17 +70,17 @@ export async function getStockPrice(code: string): Promise<StockPrice> {
         },
       })
 
-      // Use StockPriceHistory OHLC if available (accurate), otherwise fallback to Stock table
-      const openPrice = latestCandle?.openPrice ?? stock.openPrice
-      const highPrice = latestCandle?.highPrice ?? stock.highPrice
-      const lowPrice = latestCandle?.lowPrice ?? stock.lowPrice
-      const volume = latestCandle ? Number(latestCandle.volume) : Number(stock.volume)
+      // Use today's candle OHLC if available, otherwise fallback to Stock table
+      // Stock table contains current intraday data updated every 5 minutes
+      const openPrice = todayCandle?.openPrice ?? stock.openPrice
+      const highPrice = todayCandle?.highPrice ?? stock.highPrice
+      const lowPrice = todayCandle?.lowPrice ?? stock.lowPrice
+      const volume = todayCandle ? Number(todayCandle.volume) : Number(stock.volume)
 
       // Current price logic:
-      // Always prefer historical candle data if available (most accurate)
-      // Only use Stock.currentPrice if no historical data exists
+      // Prefer today's candle closePrice if available, otherwise use Stock.currentPrice
       const marketOpen = isMarketOpen()
-      const currentPrice = latestCandle?.closePrice ?? stock.currentPrice
+      const currentPrice = todayCandle?.closePrice ?? stock.currentPrice
 
       // Calculate change and change rate based on previous day's close
       // Use previous candle's closePrice, fallback to openPrice

@@ -75,13 +75,10 @@ export async function getStockPrice(code: string): Promise<StockPrice> {
       const volume = latestCandle ? Number(latestCandle.volume) : Number(stock.volume)
 
       // Current price logic:
-      // - During market hours (09:00-15:30): Use Stock.currentPrice (real-time updates)
-      // - After market close: Use StockPriceHistory.closePrice (accurate closing price)
-      // - If no closePrice available: Fallback to Stock.currentPrice
+      // Always prefer historical candle data if available (most accurate)
+      // Only use Stock.currentPrice if no historical data exists
       const marketOpen = isMarketOpen()
-      const currentPrice = !marketOpen && latestCandle?.closePrice
-        ? latestCandle.closePrice
-        : stock.currentPrice
+      const currentPrice = latestCandle?.closePrice ?? stock.currentPrice
 
       // Calculate change and change rate based on previous day's close
       // Use previous candle's closePrice, fallback to openPrice

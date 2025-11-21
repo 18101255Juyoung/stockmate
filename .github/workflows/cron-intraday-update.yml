@@ -2,9 +2,11 @@ name: Cron - Intraday Price Update
 
 on:
   schedule:
-    # Every 5 minutes during market hours (09:00-15:30 KST = 00:00-06:30 UTC)
-    # 09:00 KST = 00:00 UTC, 15:30 KST = 06:30 UTC
-    - cron: '*/5 0-6 * * 1-5'
+    # Every 5 minutes during market hours (09:10-15:30 KST = 00:10-06:30 UTC)
+    # Start at 09:10 to wait for KIS API data availability
+    # 09:10 KST = 00:10 UTC, 15:30 KST = 06:30 UTC
+    - cron: '10-59/5 0 * * 1-5'  # 09:10-09:55 KST (every 5 min)
+    - cron: '*/5 1-6 * * 1-5'      # 10:00-15:30 KST (every 5 min)
   workflow_dispatch: # Allow manual trigger
 
 jobs:

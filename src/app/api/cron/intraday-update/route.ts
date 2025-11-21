@@ -27,6 +27,20 @@ export async function POST(request: NextRequest) {
     })
   }
 
+  // Additional safety: wait for KIS API data availability (09:10+ KST)
+  const now = new Date()
+  const kstTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }))
+  const hour = kstTime.getHours()
+  const minute = kstTime.getMinutes()
+
+  if (hour === 9 && minute < 10) {
+    return Response.json({
+      success: false,
+      message: 'Waiting for market data availability (runs after 09:10 KST)',
+      timestamp: new Date().toISOString()
+    })
+  }
+
   console.log('\n🔄 [Cron API] Starting intraday update (prices + today candles)...')
   const startTime = Date.now()
 
